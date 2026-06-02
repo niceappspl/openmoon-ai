@@ -24,7 +24,7 @@
 <img src="docs/demo.gif" alt="openMOON demo" width="680"/>
 -->
 
-[Quick Start](#-quick-start) · [Features](#-features) · [Architecture](#-architecture) · [Contributing](#-contributing) · [Roadmap](ROADMAP.md)
+[Quick Start](#-quick-start) · [Features](#-features) · [MCP Servers](MCP.md) · [Architecture](#-architecture) · [Contributing](#-contributing) · [Roadmap](ROADMAP.md)
 
 </div>
 
@@ -81,7 +81,7 @@ prompt → [tool call] → result → [tool call] → result → ... → final a
 
 openMOON is a complete [MCP](https://modelcontextprotocol.io) host. It runs local `stdio` servers and connects to remote `http`/`sse` servers (Streamable HTTP). Add a server in `config.json`, restart, and its tools are immediately available to the agent.
 
-Ships with ~70 tools across 5 bundled servers:
+Ships with ~77 tools across 5 bundled servers — full list in [MCP.md](MCP.md):
 
 | Server | What it controls |
 |--------|-----------------|
