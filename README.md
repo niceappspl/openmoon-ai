@@ -2,7 +2,7 @@
 
 <img src="src-tauri/icons/icon.png" alt="openMOON" width="120"/>
 
-# openMOON
+# openMOON AI
 
 ### The open-source AI agent for macOS that actually *does* things.
 
