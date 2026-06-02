@@ -12,7 +12,9 @@
 #   APPLE_PASSWORD             — app-specific password for APPLE_ID
 #   APPLE_TEAM_ID              — 10-character Apple Developer Team ID
 #
-# TODO: add updater.pubkey for auto-update (#83)
+# Tauri updater signing (set in repo Settings → Secrets → Actions):
+#   TAURI_SIGNING_PRIVATE_KEY          — base64-encoded private key (generated via: npx @tauri-apps/cli signer generate)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — password used during key generation (openmoon-release-2026)
 
 name: Release
 
@@ -68,6 +70,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_INCREMENTAL: "0"
+          # Tauri updater signing — set TAURI_SIGNING_PRIVATE_KEY + PASSWORD secrets to enable
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Apple signing/notarisation — silently skipped when secrets are absent
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -89,4 +94,4 @@ jobs:
             > **Note:** If macOS shows "unidentified developer", right-click → Open the first time (unsigned build).
           releaseDraft: ${{ github.event_name == 'workflow_dispatch' }}
           prerelease: false
-          includeUpdaterJson: false
+          includeUpdaterJson: true
