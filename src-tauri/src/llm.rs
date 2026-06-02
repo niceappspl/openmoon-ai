@@ -61,6 +61,68 @@ pub struct ChatStepResult {
     pub tool_calls: Vec<ToolCall>,
 }
 
+/// Per-session spend guard for the agent loop.
+#[derive(Debug, Clone)]
+pub struct Budget {
+    /// Hard cap on agent steps before stopping.
+    pub max_steps: u32,
+    /// Approximate USD spend cap (`0.0` = unlimited).
+    pub max_cost_usd: f64,
+    /// USD price per 1M input tokens, when the provider/model is known and
+    /// priceable. `None` disables cost enforcement (e.g. local Ollama models).
+    pub input_price_per_mtok: Option<f64>,
+}
+
+/// USD price per 1M input tokens for known OpenAI models. Returns `None` for
+/// other providers or unknown models so cost enforcement is skipped rather than
+/// guessed. Mirrors the frontend price table in `src/utils/tokens.ts`.
+pub fn input_price_per_mtok(provider: &str, model: &str) -> Option<f64> {
+    if provider != "openai" {
+        return None;
+    }
+    let price = match model {
+        "gpt-4o-mini" => 0.15,
+        "gpt-4o" => 2.5,
+        "gpt-4.1" => 2.0,
+        "gpt-4.1-mini" => 0.4,
+        "gpt-4.1-nano" => 0.1,
+        "gpt-4-turbo" => 10.0,
+        "gpt-3.5-turbo" => 0.5,
+        _ => return None,
+    };
+    Some(price)
+}
+
+/// Best-effort input-token estimate for the messages sent in one step, using a
+/// documented ~4-chars-per-token heuristic. Each step re-sends the full
+/// (growing) context, so accumulating this across steps approximates the
+/// dominant input-token cost of a runaway loop without extra plumbing.
+fn estimate_input_tokens(messages: &[ProviderMessage]) -> u32 {
+    let mut chars = 0usize;
+    for message in messages {
+        match message {
+            ProviderMessage::System(content) | ProviderMessage::User(content) => {
+                chars += content.len();
+            }
+            ProviderMessage::Assistant {
+                content,
+                tool_calls,
+            } => {
+                if let Some(content) = content {
+                    chars += content.len();
+                }
+                for call in tool_calls {
+                    chars += call.name.len() + call.arguments.len();
+                }
+            }
+            ProviderMessage::Tool { content, .. } => {
+                chars += content.len();
+            }
+        }
+    }
+    (chars / 4) as u32
+}
+
 /// Abstraction over a chat-completions-with-tools backend used by the agent loop.
 #[async_trait::async_trait]
 pub trait LlmProvider: Send + Sync {
@@ -253,7 +315,7 @@ pub async fn run_agent<F, Fut, E>(
     prompt: &str,
     history: &[ChatMessage],
     tools: &serde_json::Value,
-    max_steps: u32,
+    budget: Budget,
     execute_tool: F,
     mut on_step: E,
 ) -> Result<String, String>
@@ -281,13 +343,18 @@ where
 
     messages.push(ProviderMessage::User(prompt.to_string()));
 
-    let mut final_text = String::new();
+    let mut estimated_cost_usd = 0.0_f64;
 
-    for step in 1..=max_steps {
+    for step in 1..=budget.max_steps {
+        if let Some(price) = budget.input_price_per_mtok {
+            let step_tokens = estimate_input_tokens(&messages);
+            estimated_cost_usd += (step_tokens as f64 / 1_000_000.0) * price;
+        }
+
         let result = provider.chat_step(&messages, tools).await?;
 
         if result.tool_calls.is_empty() {
-            final_text = result.content.clone().unwrap_or_default();
+            let final_text = result.content.clone().unwrap_or_default();
             on_step(AgentStep {
                 step,
                 kind: "final".to_string(),
@@ -331,16 +398,33 @@ where
                 content: result_text,
             });
         }
+
+        if budget.max_cost_usd > 0.0 && estimated_cost_usd >= budget.max_cost_usd {
+            let summary = format!(
+                "Reached the cost budget (~${:.2}) for this task — stopped to avoid runaway cost. Raise it in Settings.",
+                budget.max_cost_usd
+            );
+            on_step(AgentStep {
+                step,
+                kind: "budget".to_string(),
+                tool: None,
+                summary: summary.clone(),
+            });
+            return Ok(summary);
+        }
     }
 
-    if final_text.is_empty() {
-        Ok(format!(
-            "Reached the maximum of {} steps without completing the task.",
-            max_steps
-        ))
-    } else {
-        Ok(final_text)
-    }
+    let summary = format!(
+        "Reached the step budget ({}) for this task — stopped to avoid runaway cost. Raise it in Settings.",
+        budget.max_steps
+    );
+    on_step(AgentStep {
+        step: budget.max_steps,
+        kind: "budget".to_string(),
+        tool: None,
+        summary: summary.clone(),
+    });
+    Ok(summary)
 }
 
 fn convert_mcp_tools_to_openai(

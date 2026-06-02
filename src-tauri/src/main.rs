@@ -583,6 +583,24 @@ fn security_settings() -> security::SecuritySettings {
     settings::load().security
 }
 
+/// Builds the per-session spend guard from settings. Falls back to
+/// `MAX_AGENT_STEPS` when no step budget is configured (e.g. value `0`).
+fn build_budget(app_settings: &settings::AppSettings) -> llm::Budget {
+    let max_steps = if app_settings.max_steps_per_session == 0 {
+        MAX_AGENT_STEPS
+    } else {
+        app_settings.max_steps_per_session
+    };
+    llm::Budget {
+        max_steps,
+        max_cost_usd: app_settings.max_cost_usd_per_session,
+        input_price_per_mtok: llm::input_price_per_mtok(
+            &app_settings.provider,
+            &app_settings.model,
+        ),
+    }
+}
+
 async fn run_prompt_trigger(
     manager: &Arc<mcp_multi::McpManager>,
     approvals: &Arc<ApprovalRegistry>,
@@ -616,7 +634,7 @@ async fn run_prompt_trigger(
         prompt,
         &[],
         &tools_for_llm,
-        MAX_AGENT_STEPS,
+        build_budget(&app_settings),
         execute_tool,
         on_step,
     )
@@ -728,7 +746,7 @@ async fn send_prompt(
         &prompt,
         &history,
         &tools_for_llm,
-        MAX_AGENT_STEPS,
+        build_budget(&app_settings),
         execute_tool,
         on_step,
     )

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle, FileText } from 'lucide-react';
+import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle, FileText, Gauge } from 'lucide-react';
 import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
 
 interface SettingsProps {
@@ -20,6 +20,8 @@ interface AppSettings {
   model: string;
   ollamaBaseUrl: string;
   security: SecuritySettings;
+  maxStepsPerSession: number;
+  maxCostUsdPerSession: number;
 }
 
 interface Trigger {
@@ -62,6 +64,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   model: 'gpt-4o-mini',
   ollamaBaseUrl: 'http://localhost:11434',
   security: DEFAULT_SECURITY,
+  maxStepsPerSession: 8,
+  maxCostUsdPerSession: 0.5,
 };
 
 const POLICY_OPTIONS: PolicyValue[] = ['auto', 'ask', 'deny'];
@@ -799,6 +803,42 @@ export const Settings = ({ onClose }: SettingsProps) => {
                   <span>{testResult.message}</span>
                 </div>
               )}
+            </div>
+
+            <div className="pt-2 border-t border-white/10">
+              <h3 className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                <Gauge className="h-3 w-3" />
+                Budget
+              </h3>
+              <p className="text-[10px] text-white/40 mb-3 leading-relaxed">
+                Per-task safety limits. The agent loop stops once either limit is reached to avoid runaway cost.
+              </p>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-[11px] text-white/70 mb-1 block">Max steps</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={settings.maxStepsPerSession}
+                    onChange={(e) => persistSettings({ ...settings, maxStepsPerSession: Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 focus:outline-none focus:border-blue-500/50"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[11px] text-white/70 mb-1 block">Max cost (USD)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.05}
+                    value={settings.maxCostUsdPerSession}
+                    onChange={(e) => persistSettings({ ...settings, maxCostUsdPerSession: Math.max(0, Number(e.target.value) || 0) })}
+                    className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 focus:outline-none focus:border-blue-500/50"
+                  />
+                </div>
+              </div>
+              <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
+                Cost is an approximate estimate from input-token usage (OpenAI models only); set 0 for unlimited.
+              </p>
             </div>
 
             <div className="pt-2 border-t border-white/10">

@@ -2,6 +2,16 @@ use crate::security::SecuritySettings;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Default per-session step budget; mirrors the historical `MAX_AGENT_STEPS`.
+fn default_max_steps_per_session() -> u32 {
+    8
+}
+
+/// Default per-session cost budget in USD (`0.0` means unlimited).
+fn default_max_cost_usd_per_session() -> f64 {
+    0.50
+}
+
 /// User-configurable LLM settings, persisted as JSON in the openMOON config dir.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -11,6 +21,18 @@ pub struct AppSettings {
     pub ollama_base_url: String,
     #[serde(default)]
     pub security: SecuritySettings,
+    /// Hard cap on agent steps per task before stopping to avoid runaway cost.
+    #[serde(
+        default = "default_max_steps_per_session",
+        rename = "maxStepsPerSession"
+    )]
+    pub max_steps_per_session: u32,
+    /// Approximate USD spend cap per task (`0.0` = unlimited).
+    #[serde(
+        default = "default_max_cost_usd_per_session",
+        rename = "maxCostUsdPerSession"
+    )]
+    pub max_cost_usd_per_session: f64,
 }
 
 impl Default for AppSettings {
@@ -20,6 +42,8 @@ impl Default for AppSettings {
             model: "gpt-4o-mini".to_string(),
             ollama_base_url: "http://localhost:11434".to_string(),
             security: SecuritySettings::default(),
+            max_steps_per_session: default_max_steps_per_session(),
+            max_cost_usd_per_session: default_max_cost_usd_per_session(),
         }
     }
 }
