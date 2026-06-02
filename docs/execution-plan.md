@@ -19,13 +19,18 @@
 - The **critical path** to the North Star is: WS-1 → (WS-3 ∥ WS-4) → WS-5 → WS-6.
 
 ```
+WS-9 onboarding/UX ─► (makes v0.1 usable by non-developers — START HERE)
 v0.1 release ──┐
                ├─► WS-1 prompt refactor ─┬─► WS-3 browser ─┐
 WS-2 platform ─┘   (unblocks routing)    └─► WS-4 computer ├─► WS-5 background ─► WS-6 verify
                                                             ┘        runner
 WS-7 safety-at-scale runs alongside WS-3..6
-WS-8 ecosystem runs in parallel throughout
+WS-8 ecosystem · WS-10 lifecycle/resilience run in parallel throughout
 ```
+
+> **Product-readiness gate:** WS-9 is not optional polish. A shipped `.dmg` is
+> useless if a user can't enter an API key in-app (today it's `.env`-only). WS-9.1
+> is a v0.1 **blocker** and should land with — or before — the first release.
 
 ---
 
@@ -33,7 +38,7 @@ WS-8 ecosystem runs in parallel throughout
 
 | Milestone | Theme | What "done" means |
 |---|---|---|
-| **v0.1 — Public Release** | Installable & trustworthy | A non-developer can install a signed `.dmg`, run locally on Ollama, and trust the approval/audit model |
+| **v0.1 — Public Release** | Installable, usable & trustworthy | A non-developer can install a signed `.dmg`, **enter their API key in-app (or pick Ollama) via a first-run flow**, run locally, and trust the approval/audit model |
 | **v0.2 — Ecosystem** | Open MCP host grows | Behaviour-only prompt; more servers/providers; marketplace; plugin API |
 | **v0.3 — Cross-platform** | Beyond macOS | `PlatformAutomation` boundary; Windows automation server |
 | **v0.4 — Universal autonomous control** | The North Star | Browser + computer-use + background runner + self-verification |
@@ -184,9 +189,49 @@ Each new MCP server/provider expands what the agent can do for free.
 
 ---
 
+## WS-9 — Onboarding & product UX  *(epics: new · milestones v0.1 / v0.2)*  **← makes it usable by real people**
+
+Today the app is a developer build: API key via `.env`, no first-run flow, isolated UI features with no cohesive design. This workstream closes the gap between "runs on the maintainer's machine" and "a person can download and use it".
+
+### 9a — First-run onboarding & in-app provider setup *(epic · v0.1)*
+
+| ID | Task | Depends on | Effort | gfi |
+|----|------|-----------|--------|-----|
+| 9.1 | **[CRITICAL]** Move API key + provider config into `AppSettings`; read from settings (env as fallback); store the key in the OS keychain, not plaintext | — | M | |
+| 9.2 | Provider section in Settings: OpenAI key field, Ollama URL, model picker, **Test connection** | 9.1 | M | |
+| 9.3 | First-run onboarding flow: welcome → choose provider (paste key *or* pick Ollama) → grant permissions (folds in #43) → ready | 9.2 | M | |
+| 9.4 | Validate key/model before saving; clear, actionable errors on invalid/missing key | 9.2 | S | ✓ |
+| 9.5 | Graceful "not configured yet" state on the main input (route the user to setup) | 9.3 | S | ✓ |
+
+### 9b — UI/UX coherence pass *(epic · v0.1 foundations, v0.2 polish)*
+
+| ID | Task | Depends on | Effort | gfi |
+|----|------|-----------|--------|-----|
+| 9.6 | Design tokens / shared component styling for the glass UI (buttons, inputs, cards, badges) | — | M | |
+| 9.7 | Global states: consistent loading, empty, error, success patterns | 9.6 | M | |
+| 9.8 | Settings information architecture: tabs/sections as settings grow (provider · security · triggers · tasks · permissions · audit) | 9.6 | M | (frontend) |
+| 9.9 | Agent error surfacing: human-readable failures + retry, not raw error strings | 9.7 | S | ✓ |
+| 9.10 | Accessibility & keyboard navigation pass (focus order, ARIA, contrast) | 9.6 | M | |
+| 9.11 | Window/content auto-sizing polish (no jank as content streams in) | — | S | |
+
+---
+
+## WS-10 — App lifecycle & resilience  *(epic: new · milestone v0.1)*  **(parallel)**
+
+The unglamorous but essential layer that makes a desktop app trustworthy and maintainable.
+
+| ID | Task | Depends on | Effort | gfi |
+|----|------|-----------|--------|-----|
+| 10.1 | Auto-update (Tauri updater) so shipped apps can self-update | WS-0.1 | M | |
+| 10.2 | Crash/error capture → log file with a discoverable location + "open logs" action | — | S | ✓ |
+| 10.3 | Per-session cost/step budget guard (warn/stop before runaway LLM spend) | WS-0.6 token counter | S | |
+| 10.4 | Health checks on startup: provider reachable, MCP servers started, permissions granted — surfaced in UI | 9.1 | M | |
+
+---
+
 ## Suggested sequencing (for maintainers assigning work)
 
-1. **Ship v0.1** (WS-0.1–0.4) so people can actually run it. In parallel, WS-0.5 permission onboarding.
+1. **Make v0.1 actually usable**: land **WS-9.1 (in-app API key — critical)** and WS-9.2/9.3 onboarding *first*, then WS-0.1–0.4 (.dmg, Ollama). A release without in-app key entry is dead on arrival for non-developers. WS-10.2 (logs) and WS-9.6/9.7 (design tokens + states) round out a credible first release.
 2. **Land WS-1** (prompt refactor) — unblocks every new capability routing.
 3. **Fork effort**: WS-3 (browser) and WS-4 (computer-use) can proceed in parallel — different skill sets (web/Playwright vs. macOS/Rust AX).
 4. **WS-5** (background runner) — the moment openMOON becomes "delegate-and-walk-away". Start 5.1–5.3 as soon as WS-1 is stable; it doesn't strictly need WS-3/4.
