@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle } from 'lucide-react';
+import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle, FileText } from 'lucide-react';
 import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
 
 interface SettingsProps {
@@ -241,6 +241,7 @@ export const Settings = ({ onClose }: SettingsProps) => {
   const [savingKey, setSavingKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [logPath, setLogPath] = useState('');
   const [newTrigger, setNewTrigger] = useState<Trigger>({
     id: '',
     name: '',
@@ -266,6 +267,16 @@ export const Settings = ({ onClose }: SettingsProps) => {
   useEffect(() => {
     refreshKeyStatus();
   }, []);
+
+  useEffect(() => {
+    invoke<string>('get_log_path')
+      .then(setLogPath)
+      .catch(() => setLogPath(''));
+  }, []);
+
+  const handleOpenLogs = () => {
+    invoke('open_logs').catch(() => {});
+  };
 
   useEffect(() => {
     if (activeTab === 'triggers') {
@@ -787,6 +798,26 @@ export const Settings = ({ onClose }: SettingsProps) => {
                   )}
                   <span>{testResult.message}</span>
                 </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-white/10">
+              <h3 className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                <FileText className="h-3 w-3" />
+                Diagnostics
+              </h3>
+              <p className="text-[10px] text-white/40 mb-2 leading-relaxed">
+                Errors and crashes are written to a local log file. Open it to help with troubleshooting.
+              </p>
+              <button
+                onClick={handleOpenLogs}
+                className="flex items-center gap-1.5 px-3 py-2 rounded text-xs text-white/80 border border-white/15 bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                <FolderOpen className="h-3 w-3" />
+                Open logs
+              </button>
+              {logPath && (
+                <p className="mt-2 text-[10px] text-white/30 leading-relaxed break-all">{logPath}</p>
               )}
             </div>
           </div>

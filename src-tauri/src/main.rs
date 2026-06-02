@@ -2,6 +2,7 @@
 
 mod db;
 mod llm;
+mod logging;
 mod mcp_multi;
 mod ollama;
 mod permissions;
@@ -1417,6 +1418,9 @@ fn mcp_config_path() -> Result<String, String> {
 }
 
 fn main() {
+    // Initialise file logging + panic hook before anything else can fail.
+    logging::init();
+
     // Load .env file
     dotenv::dotenv().ok();
 
@@ -1646,7 +1650,9 @@ fn main() {
             ollama::ollama_pull,
             permissions::check_permissions,
             permissions::request_permission,
-            permissions::open_permission_settings
+            permissions::open_permission_settings,
+            logging::get_log_path,
+            logging::open_logs
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
