@@ -4,6 +4,7 @@ mod db;
 mod llm;
 mod mcp_multi;
 mod ollama;
+mod secrets;
 mod security;
 mod settings;
 mod triggers;
@@ -352,8 +353,9 @@ fn build_provider(
             app_settings.model.clone(),
         ))),
         _ => {
-            let api_key = std::env::var("OPENAI_API_KEY")
-                .map_err(|_| "OPENAI_API_KEY not set in environment".to_string())?;
+            let api_key = secrets::get_api_key("openai").ok_or_else(|| {
+                "No OpenAI API key configured. Add one in Settings → Provider.".to_string()
+            })?;
             let model = if app_settings.model.is_empty() {
                 "gpt-4o-mini".to_string()
             } else {
@@ -1484,6 +1486,9 @@ fn main() {
             reset_session,
             get_settings,
             save_settings,
+            secrets::set_api_key,
+            secrets::remove_api_key,
+            secrets::has_api_key_cmd,
             get_notes,
             add_note,
             clear_notes,
