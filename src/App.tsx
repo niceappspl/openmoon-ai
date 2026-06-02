@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { AI_SUGGESTIONS, getAppIcon } from './utils/constants';
-import { Mail, X, Sparkles } from 'lucide-react';
+import { Mail, X, Sparkles, AlertTriangle, RotateCcw, Settings2 } from 'lucide-react';
+import { classifyError, isBudgetResponse, type ClassifiedError } from './utils/errorClassifier';
 import { useMcp } from './hooks/useMcp';
 import { useApps } from './hooks/useApps';
 import { useQuickNotes } from './hooks/useQuickNotes';
@@ -57,9 +58,11 @@ function App() {
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
   const [recordedSteps, setRecordedSteps] = useState<RecordedStep[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [agentError, setAgentError] = useState<ClassifiedError | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastPromptRef = useRef<string>('');
 
   // Custom hooks
   const { mcpLoading } = useMcp();
@@ -71,7 +74,7 @@ function App() {
   const { tokens, costUsd } = useTokenCount(`${input}${response ? `\n${response}` : ''}`);
   const { adjustWindowSizeAndPosition } = useWindowManager(
     containerRef,
-    [response, showSuggestions, showCommandMenu, input, filteredSuggestions.length, showTestCommands, showSettings, agentSteps.length, approval, recordedSteps.length, showOnboarding, providerConfigured],
+    [response, showSuggestions, showCommandMenu, input, filteredSuggestions.length, showTestCommands, showSettings, agentSteps.length, approval, recordedSteps.length, showOnboarding, providerConfigured, agentError],
     showWorkflows
   );
 
@@ -191,6 +194,7 @@ function App() {
       setInput('');
       setApproval(null);
       setRecordedSteps([]);
+      setAgentError(null);
     });
 
     return () => {
@@ -201,6 +205,52 @@ function App() {
   const handleApprovalDecision = (id: string, approved: boolean) => {
     invoke('respond_approval', { requestId: id, approved }).catch(() => {});
     setApproval(null);
+  };
+
+  const executePrompt = async (userMessage: string) => {
+    lastPromptRef.current = userMessage;
+    setIsLoading(true);
+    setResponse('');
+    setAgentError(null);
+    setAgentSteps([]);
+    setRecordedSteps([]);
+    setShowSuggestions(false);
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '28px';
+    }
+
+    try {
+      const result = await invoke<string>('send_prompt', { prompt: userMessage });
+      setResponse(result);
+
+      try {
+        const steps = await invoke<RecordedStep[]>('get_recorded_steps');
+        setRecordedSteps(steps);
+      } catch {
+        setRecordedSteps([]);
+      }
+
+      if (result.includes('Do you want to read the email content?')) {
+        const mailSuggestions = [
+          { icon: Mail, label: 'Yes', prompt: 'read email', category: 'Mail' },
+          { icon: X, label: 'No', prompt: 'no thanks', category: 'Mail' },
+        ];
+        setFilteredSuggestions(mailSuggestions);
+        setShowSuggestions(true);
+        setSelectedSuggestion(0);
+      }
+    } catch (error) {
+      setAgentError(classifyError(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (lastPromptRef.current) {
+      executePrompt(lastPromptRef.current);
+    }
   };
 
   // Global keyboard handlers
@@ -216,8 +266,9 @@ function App() {
           setShowWorkflows(false);
         } else if (showTestCommands) {
           setShowTestCommands(false);
-        } else if (response) {
+        } else if (response || agentError) {
           setResponse('');
+          setAgentError(null);
         } else if (showSuggestions) {
           setShowSuggestions(false);
         }
@@ -245,7 +296,7 @@ function App() {
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [showCommandMenu, showWorkflows, showTestCommands, showSettings, response, showSuggestions]);
+  }, [showCommandMenu, showWorkflows, showTestCommands, showSettings, response, agentError, showSuggestions]);
 
   // Filter suggestions based on input
   useEffect(() => {
@@ -340,11 +391,32 @@ function App() {
 
   const handleClearResponse = () => {
     setResponse('');
+    setAgentError(null);
     setAgentSteps([]);
     setRecordedSteps([]);
     setTimeout(() => {
       adjustWindowSizeAndPosition();
     }, 0);
+  };
+
+  const handleReplay = async (prompt: string) => {
+    if (isLoading) return;
+    setShowSettings(false);
+    setIsLoading(true);
+    setResponse('');
+    setAgentSteps([]);
+    setRecordedSteps([]);
+    try {
+      const result = await invoke<string>('send_prompt', { prompt });
+      setResponse(result);
+      invoke<RecordedStep[]>('get_recorded_steps')
+        .then(setRecordedSteps)
+        .catch(() => {});
+    } catch (error) {
+      setResponse(`Error: ${error}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -417,53 +489,8 @@ function App() {
       return;
     }
 
-    setIsLoading(true);
-    setResponse('');
-    setAgentSteps([]);
-    setRecordedSteps([]);
     setInput('');
-    setShowSuggestions(false);
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '28px';
-    }
-
-    try {
-      const result = await invoke<string>('send_prompt', { prompt: userMessage });
-      setResponse(result);
-
-      try {
-        const steps = await invoke<RecordedStep[]>('get_recorded_steps');
-        setRecordedSteps(steps);
-      } catch {
-        setRecordedSteps([]);
-      }
-      
-      if (result.includes('Do you want to read the email content?')) {
-        const mailSuggestions = [
-          {
-            icon: Mail,
-            label: 'Yes',
-            prompt: 'read email',
-            category: 'Mail'
-          },
-          {
-            icon: X,
-            label: 'No', 
-            prompt: 'no thanks',
-            category: 'Mail'
-          }
-        ];
-        
-        setFilteredSuggestions(mailSuggestions);
-        setShowSuggestions(true);
-        setSelectedSuggestion(0);
-      }
-    } catch (error) {
-      setResponse(`Error: ${error}`);
-    } finally {
-      setIsLoading(false);
-    }
+    await executePrompt(userMessage);
   };
 
   const handleSuggestionClick = async (suggestion: typeof AI_SUGGESTIONS[0]) => {
@@ -510,8 +537,9 @@ function App() {
         setShowWorkflows(false);
       } else if (showTestCommands) {
         setShowTestCommands(false);
-      } else if (response) {
+      } else if (response || agentError) {
         setResponse('');
+        setAgentError(null);
       } else {
         setShowSuggestions(false);
       }
@@ -621,6 +649,7 @@ function App() {
                   setShowSettings(false);
                   refreshProvider();
                 }}
+                onReplay={handleReplay}
               />
             )}
 
@@ -700,6 +729,67 @@ function App() {
                     response={response}
                     onClear={handleClearResponse}
                   />
+                )}
+
+                {response && isBudgetResponse(response) && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      onClick={() => setShowSettings(true)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-amber-400 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                    >
+                      <Settings2 className="h-3 w-3" />
+                      Raise limit in Settings
+                    </button>
+                  </div>
+                )}
+
+                {agentError && (
+                  <div className="mt-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-500/5 backdrop-blur-sm">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-red-400/80 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-white/80">{agentError.message}</p>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {agentError.category === 'provider' && (
+                              <button
+                                onClick={() => { setAgentError(null); setShowSettings(true); }}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
+                              >
+                                <Settings2 className="h-3 w-3" />
+                                Open Settings
+                              </button>
+                            )}
+                            {agentError.category === 'budget' && (
+                              <button
+                                onClick={() => { setAgentError(null); setShowSettings(true); }}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-amber-400 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                              >
+                                <Settings2 className="h-3 w-3" />
+                                Raise limit in Settings
+                              </button>
+                            )}
+                            {(agentError.category === 'tool' || agentError.category === 'unknown') && (
+                              <button
+                                onClick={handleRetry}
+                                disabled={isLoading}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-white/70 border border-white/20 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                Retry
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setAgentError(null)}
+                              className="px-2.5 py-1 rounded-md text-[11px] text-white/40 hover:text-white/60 transition-colors"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {approval && (
