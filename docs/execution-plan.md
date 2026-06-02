@@ -58,8 +58,7 @@ Get it into people's hands and make autonomy *safe to grow into*.
 | 0.5 | First-run onboarding: request Accessibility & Screen Recording permissions | — | M | | new |
 | 0.6 | Token counter in UI | — | S | ✓ | #3 |
 | 0.7 | Syntax highlighting in responses | — | S | ✓ | #7 |
-| 0.8 | Dark / light theme | — | S | ✓ | #4 |
-| 0.9 | Session history browser | — | M | ✓ | #20 |
+| 0.8 | Session history browser | — | M | ✓ | #20 |
 
 > 0.5 is here (not in v0.4) on purpose: permissions onboarding is needed before computer-use and is best designed once, early.
 

@@ -260,7 +260,7 @@ Restart the app — the server starts automatically and all its tools are instan
 | Area | Ideas |
 |------|-------|
 | 🔌 MCP servers | Add integrations: Slack, GitHub, Notion, Linear, Spotify … |
-| 🎨 UI / UX | Improve the response display, add keyboard shortcuts, dark/light theme |
+| 🎨 UI / UX | Improve the response display, add keyboard shortcuts, onboarding & provider setup |
 | 🪟 Cross-platform | Research Windows / Linux support (Tauri supports both) |
 | ⚡ Triggers | Webhook trigger, system-event trigger (network change, app launch) |
 | 🤖 Models | Better Ollama compatibility, model picker, token counter |
