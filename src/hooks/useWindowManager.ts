@@ -6,79 +6,97 @@ interface WindowState {
   normalPosition: { x: number; y: number } | null;
   isExpanded: boolean;
   maxHeight: number;
+  maxHeightComputed: boolean;
 }
+
+const WINDOW_WIDTH = 600;
+const WORKFLOW_WIDTH = 800;
+const MIN_HEIGHT = 100;
+const HEIGHT_BUFFER = 10;
+const HEIGHT_THRESHOLD = 3;
+const DEFAULT_MAX_HEIGHT = 600;
 
 export const useWindowManager = (
   containerRef: RefObject<HTMLDivElement>,
-  dependencies: any[],
+  dependencies: unknown[],
   isWorkflowMode: boolean = false
 ) => {
   // Store window state with screen-responsive max height
   const windowStateRef = useRef<WindowState>({
     normalPosition: null,
     isExpanded: false,
-    maxHeight: 600 // Will be updated with actual screen height
+    maxHeight: DEFAULT_MAX_HEIGHT,
+    maxHeightComputed: false
   });
 
-  const adjustWindowSizeAndPosition = useCallback(async () => {
-    if (!containerRef.current) return;
+  // Coalesce rapid resize requests into a single per-frame measurement
+  const rafRef = useRef<number | null>(null);
+  // Track the last logical height we applied to skip no-op setSize calls
+  const lastAppliedHeightRef = useRef<number>(0);
+
+  const ensureMaxHeight = useCallback(async (): Promise<number> => {
+    if (windowStateRef.current.maxHeightComputed) {
+      return windowStateRef.current.maxHeight;
+    }
+    const monitors = await availableMonitors();
+    if (monitors && monitors.length > 0) {
+      const primaryMonitor = monitors[0];
+      const screenHeight = primaryMonitor.size.height / primaryMonitor.scaleFactor;
+      windowStateRef.current.maxHeight = Math.floor(screenHeight * 0.6);
+      windowStateRef.current.maxHeightComputed = true;
+    }
+    return windowStateRef.current.maxHeight;
+  }, []);
+
+  const performResize = useCallback(async () => {
+    const el = containerRef.current;
+    if (!el) return;
 
     try {
       const window = getCurrentWindow();
-      const monitors = await availableMonitors();
-      if (!monitors || monitors.length === 0) return;
+      const maxHeight = await ensureMaxHeight();
 
-      const primaryMonitor = monitors[0];
-      const screenSize = primaryMonitor.size;
-      const screenScale = primaryMonitor.scaleFactor;
-      const screenHeight = screenSize.height / screenScale;
-
-      // Simple max height - 60% of screen height
-      const maxHeight = Math.floor(screenHeight * 0.60);
-      windowStateRef.current.maxHeight = maxHeight;
-
-      // Fixed window width
-      const windowWidth = 600;
-      let windowHeight = 100;
-
-      // Handle workflow mode (expanded view)
+      // Workflow mode (expanded view) — fixed size, centered
       if (isWorkflowMode) {
-        const workflowWidth = 800;
         const workflowHeight = Math.min(600, maxHeight);
-
-        if (!windowStateRef.current.isExpanded) {
-          windowStateRef.current.isExpanded = true;
-        }
-
-        await window.setSize(new LogicalSize(workflowWidth, workflowHeight));
+        windowStateRef.current.isExpanded = true;
+        lastAppliedHeightRef.current = workflowHeight;
+        await window.setSize(new LogicalSize(WORKFLOW_WIDTH, workflowHeight));
         await window.center();
         return;
       }
 
-      // If returning from workflow mode
-      if (windowStateRef.current.isExpanded && !isWorkflowMode) {
+      if (windowStateRef.current.isExpanded) {
         windowStateRef.current.isExpanded = false;
       }
 
-      // Normal mode - ONLY adjust height, NEVER move window
-      const contentHeight = containerRef.current.offsetHeight;
-      const minHeight = 100;
-      const desiredHeight = contentHeight + 10;
-      windowHeight = Math.min(Math.max(desiredHeight, minHeight), maxHeight);
+      // Measure full content height (independent of any cap we apply below)
+      const desiredHeight = el.scrollHeight + HEIGHT_BUFFER;
+      const windowHeight = Math.min(Math.max(desiredHeight, MIN_HEIGHT), maxHeight);
 
-      // Only update if height changed by more than 3px (prevent micro-adjustments)
-      const currentSize = await window.outerSize();
-      const heightDiff = Math.abs(currentSize.height - windowHeight);
-      
-      if (heightDiff > 3) {
-        await window.setSize(new LogicalSize(windowWidth, windowHeight));
-      } else {
+      // Past the cap, let the content scroll internally instead of clipping
+      const overflowing = desiredHeight > maxHeight;
+      el.style.maxHeight = overflowing ? `${maxHeight - HEIGHT_BUFFER}px` : '';
+      el.style.overflowY = overflowing ? 'auto' : '';
+
+      // Skip churn: only resize when the target differs meaningfully
+      if (Math.abs(lastAppliedHeightRef.current - windowHeight) > HEIGHT_THRESHOLD) {
+        lastAppliedHeightRef.current = windowHeight;
+        await window.setSize(new LogicalSize(WINDOW_WIDTH, windowHeight));
       }
-
     } catch (error) {
       console.error('Window adjustment error:', error);
     }
-  }, [containerRef, isWorkflowMode, ...dependencies]);
+  }, [containerRef, isWorkflowMode, ensureMaxHeight]);
+
+  // Public API: schedule a coalesced resize on the next animation frame
+  const adjustWindowSizeAndPosition = useCallback(() => {
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      void performResize();
+    });
+  }, [performResize]);
 
   // Initial sizing and positioning
   useEffect(() => {
@@ -94,15 +112,17 @@ export const useWindowManager = (
           const screenWidth = screenSize.width / screenScale;
           const screenHeight = screenSize.height / screenScale;
 
+          windowStateRef.current.maxHeight = Math.floor(screenHeight * 0.6);
+          windowStateRef.current.maxHeightComputed = true;
+
           // Position window in upper third of screen, centered horizontally
-          const windowWidth = 600;
-          const windowHeight = 100;
-          const x = (screenWidth - windowWidth) / 2;
-          const y = screenHeight * 0.20; // 20% from top
+          const windowHeight = MIN_HEIGHT;
+          const x = (screenWidth - WINDOW_WIDTH) / 2;
+          const y = screenHeight * 0.2; // 20% from top
 
-          await window.setSize(new LogicalSize(windowWidth, windowHeight));
+          await window.setSize(new LogicalSize(WINDOW_WIDTH, windowHeight));
           await window.setPosition(new LogicalPosition(x, y));
-
+          lastAppliedHeightRef.current = windowHeight;
         }
       } catch (error) {
         console.error('Initial sizing error:', error);
@@ -112,14 +132,34 @@ export const useWindowManager = (
     initWindow();
   }, []);
 
-  // Adjust on dependency changes
+  // Observe content size changes and coalesce them into smooth resizes
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(() => {
+      adjustWindowSizeAndPosition();
+    });
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [containerRef, adjustWindowSizeAndPosition]);
+
+  // Adjust on dependency changes (e.g. menus with entry animations)
   useEffect(() => {
     // Delay to ensure DOM has updated (CommandMenu has 200ms animation)
     const timer = setTimeout(() => {
       adjustWindowSizeAndPosition();
     }, 250);
     return () => clearTimeout(timer);
-  }, [adjustWindowSizeAndPosition]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adjustWindowSizeAndPosition, isWorkflowMode, ...dependencies]);
 
   // Setup blur listener
   useEffect(() => {
