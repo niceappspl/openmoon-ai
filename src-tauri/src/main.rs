@@ -4,6 +4,7 @@ mod db;
 mod llm;
 mod mcp_multi;
 mod ollama;
+mod permissions;
 mod secrets;
 mod security;
 mod settings;
@@ -1571,7 +1572,10 @@ fn main() {
             delete_trigger,
             set_trigger_enabled,
             ollama::ollama_status,
-            ollama::ollama_pull
+            ollama::ollama_pull,
+            permissions::check_permissions,
+            permissions::request_permission,
+            permissions::open_permission_settings
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

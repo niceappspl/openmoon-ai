@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   X, ArrowRight, ArrowLeft, CheckCircle, XCircle, Loader2, Key, Bot, Sparkles, AlertTriangle,
+  ShieldCheck, Accessibility, Monitor,
 } from 'lucide-react';
+import { usePermissions, type PermissionKind } from '../hooks/usePermissions';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -32,9 +34,9 @@ interface OllamaStatus {
  * between "provider" and "ready") by extending this array and adding a matching
  * case in `renderStep` — the navigation/progress logic adapts automatically.
  */
-type StepId = 'welcome' | 'provider' | 'ready';
+type StepId = 'welcome' | 'provider' | 'permissions' | 'ready';
 
-const STEP_ORDER: StepId[] = ['welcome', 'provider', 'ready'];
+const STEP_ORDER: StepId[] = ['welcome', 'provider', 'permissions', 'ready'];
 
 const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
@@ -68,6 +70,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const currentStep = STEP_ORDER[stepIndex];
+  const permissions = usePermissions(currentStep === 'permissions');
 
   useEffect(() => {
     invoke<AppSettings>('get_settings')
@@ -286,6 +289,101 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
             )}
           </div>
         );
+
+      case 'permissions': {
+        const { status } = permissions;
+        const rows: {
+          kind: PermissionKind;
+          icon: typeof Accessibility;
+          title: string;
+          desc: string;
+          granted: boolean;
+          requestable: boolean;
+        }[] = [
+          {
+            kind: 'accessibility',
+            icon: Accessibility,
+            title: 'Accessibility',
+            desc: 'Lets openMOON control apps and send keystrokes on your behalf.',
+            granted: status.accessibility,
+            requestable: true,
+          },
+          {
+            kind: 'screen_recording',
+            icon: Monitor,
+            title: 'Screen Recording',
+            desc: 'Needed to capture the screen and read what’s on your computer.',
+            granted: status.screenRecording,
+            requestable: true,
+          },
+        ];
+
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-purple-400/80" />
+              <h2 className="text-base font-medium text-white/90">Grant permissions</h2>
+            </div>
+            <p className="text-xs text-white/60 leading-relaxed">
+              macOS gates app and computer control behind privacy permissions. Grant these so
+              openMOON can act for you — you can change them anytime in System Settings.
+            </p>
+
+            <div className="space-y-2">
+              {rows.map((row) => {
+                const Icon = row.icon;
+                return (
+                  <div key={row.kind} className="rounded p-2.5 border border-white/10 bg-white/5">
+                    <div className="flex items-start gap-2.5">
+                      <Icon className="h-4 w-4 text-white/70 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-white/90">{row.title}</span>
+                          {row.granted ? (
+                            <span className="flex items-center gap-1 text-[10px] text-green-400">
+                              <CheckCircle className="h-3 w-3" />
+                              Granted
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-[10px] text-yellow-400/90">
+                              <AlertTriangle className="h-3 w-3" />
+                              Needed
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-[10px] text-white/50 leading-relaxed">{row.desc}</p>
+                        {!row.granted && (
+                          <div className="mt-2 flex items-center gap-2">
+                            {row.requestable && (
+                              <button
+                                onClick={() => permissions.request(row.kind)}
+                                className="px-2 py-1 rounded text-[10px] text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
+                              >
+                                Grant access
+                              </button>
+                            )}
+                            <button
+                              onClick={() => permissions.openSettings(row.kind)}
+                              className="px-2 py-1 rounded text-[10px] text-white/60 hover:text-white/90 hover:bg-white/5 transition-colors"
+                            >
+                              Open System Settings
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-[10px] text-white/40 leading-relaxed">
+              Automation (controlling other apps) is approved by macOS the first time it’s used —
+              there’s nothing to grant here in advance. You can continue without granting everything.
+            </p>
+          </div>
+        );
+      }
 
       case 'ready':
         return (
