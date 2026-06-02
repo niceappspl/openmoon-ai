@@ -1,0 +1,37 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "node",
+      "args": ["mcp-servers/filesystem/index.js"],
+      "description": "File system operations (read, write, search, list)"
+    },
+    "automation": {
+      "command": "node",
+      "args": ["mcp-servers/automation/index.js"],
+      "description": "Complete macOS automation (apps, system control, network, display, power, mail, maps, calendar, messages, reminders, notes, contacts)"
+    },
+    "productivity": {
+      "command": "node",
+      "args": ["mcp-servers/productivity/index.js"],
+      "description": "Task management, notes, pomodoro timer, habits tracking"
+    },
+    "browser": {
+      "command": "node",
+      "args": ["mcp-servers/browser/index.js"],
+      "description": "Browser automation (open URLs, search, tabs management, bookmarks)"
+    },
+    "media": {
+      "command": "node",
+      "args": ["mcp-servers/media/index.js"],
+      "description": "Media control (music playback, screenshots, screen recording)"
+    },
+    "remote-example": {
+      "transport": "http",
+      "url": "https://your-mcp-server.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${REMOTE_MCP_TOKEN}"
+      },
+      "description": "Example remote MCP connector over Streamable HTTP / SSE. ${VAR} placeholders are filled from .env at startup."
+    }
+  }
+}

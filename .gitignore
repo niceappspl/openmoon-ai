@@ -1,0 +1,20 @@
+node_modules
+dist
+target
+*.log
+.DS_Store
+src-tauri/target
+
+# secrets
+.env
+.env.local
+
+# user config (copy from config.example.json)
+mcp-servers/config.json
+
+# test output
+mcp-servers/tests/results.json
+mcp-servers/tests/functional-results.json
+
+# generated artifacts
+mcp-tools-catalog.json

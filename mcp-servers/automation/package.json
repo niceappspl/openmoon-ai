@@ -1,0 +1,13 @@
+{
+  "name": "moonos-automation-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP server for macOS automation and system control",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4"
+  }
+}

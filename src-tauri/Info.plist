@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>openMOON needs access to your microphone for voice dictation.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>openMOON needs access to speech recognition for voice commands.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>openMOON needs to control other applications to perform automation tasks.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>openMOON needs screen capture access to take screenshots.</string>
+    <key>NSUserNotificationUsageDescription</key>
+    <string>openMOON needs to send notifications for reminders and alerts.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>openMOON needs location access to read your current Wi-Fi network name on macOS.</string>
+</dict>
+</plist>
