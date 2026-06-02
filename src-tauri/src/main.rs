@@ -752,6 +752,21 @@ async fn send_prompt(
     )
     .await?;
 
+    // Persist the run; fire-and-forget so DB errors never fail the response.
+    {
+        let steps_json = recorder
+            .lock()
+            .map(|g| serde_json::to_string(g.as_slice()).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or_else(|_| "[]".to_string());
+        let _ = db::save_run(
+            &prompt,
+            &final_text,
+            &steps_json,
+            &app_settings.provider,
+            &app_settings.model,
+        );
+    }
+
     sessions.append_turn(&label, prompt, final_text.clone());
     last_run.set(&label, recorder.lock().unwrap().clone());
 
@@ -765,6 +780,16 @@ async fn reset_session(
 ) -> Result<(), String> {
     sessions.clear(window.label());
     Ok(())
+}
+
+#[tauri::command]
+fn list_runs(limit: Option<i64>) -> Result<Vec<db::RunRecord>, String> {
+    db::list_runs(limit.unwrap_or(50))
+}
+
+#[tauri::command]
+fn delete_run(id: i64) -> Result<(), String> {
+    db::delete_run(id)
 }
 
 #[tauri::command]
@@ -1634,6 +1659,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             send_prompt,
             reset_session,
+            list_runs,
+            delete_run,
             get_settings,
             save_settings,
             test_provider_connection,

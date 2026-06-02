@@ -2,6 +2,20 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// A persisted agent run (prompt + response + tool steps).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunRecord {
+    pub id: i64,
+    pub prompt: String,
+    pub response: String,
+    /// JSON array of recorded tool-call objects (`{action, params}`).
+    pub steps_json: String,
+    pub created_at: String,
+    pub provider: String,
+    pub model: String,
+}
+
 /// A single audited tool decision + execution outcome.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEntry {
@@ -73,6 +87,15 @@ fn open() -> Result<Connection, String> {
             watch_path TEXT,
             enabled INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            prompt TEXT NOT NULL,
+            response TEXT NOT NULL,
+            steps_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            provider TEXT NOT NULL DEFAULT '',
+            model TEXT NOT NULL DEFAULT ''
         );",
     )
     .map_err(|e| format!("Failed to initialize schema: {}", e))?;
@@ -235,5 +258,60 @@ pub fn set_trigger_enabled(id: &str, enabled: bool) -> Result<(), String> {
         rusqlite::params![enabled as i64, id],
     )
     .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Persists a completed agent run to the `runs` table.
+pub fn save_run(
+    prompt: &str,
+    response: &str,
+    steps_json: &str,
+    provider: &str,
+    model: &str,
+) -> Result<(), String> {
+    let conn = open()?;
+    conn.execute(
+        "INSERT INTO runs (prompt, response, steps_json, provider, model) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![prompt, response, steps_json, provider, model],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Returns the most recent runs, newest first.
+pub fn list_runs(limit: i64) -> Result<Vec<RunRecord>, String> {
+    let conn = open()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, prompt, response, steps_json, created_at, provider, model
+             FROM runs ORDER BY id DESC LIMIT ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([limit], |row| {
+            Ok(RunRecord {
+                id: row.get(0)?,
+                prompt: row.get(1)?,
+                response: row.get(2)?,
+                steps_json: row.get(3)?,
+                created_at: row.get(4)?,
+                provider: row.get(5)?,
+                model: row.get(6)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut runs = Vec::new();
+    for row in rows {
+        runs.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(runs)
+}
+
+/// Deletes a run by id.
+pub fn delete_run(id: i64) -> Result<(), String> {
+    let conn = open()?;
+    conn.execute("DELETE FROM runs WHERE id = ?1", [id])
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
