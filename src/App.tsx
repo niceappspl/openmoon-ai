@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { AI_SUGGESTIONS, getAppIcon } from './utils/constants';
-import { Mail, X } from 'lucide-react';
+import { Mail, X, Sparkles } from 'lucide-react';
 import { useMcp } from './hooks/useMcp';
 import { useApps } from './hooks/useApps';
 import { useQuickNotes } from './hooks/useQuickNotes';
 import { useRamMonitor } from './hooks/useRamMonitor';
 import { useWindowManager } from './hooks/useWindowManager';
+import { useProviderStatus } from './hooks/useProviderStatus';
 import { TopBar } from './components/TopBar';
 import { CommandMenu } from './components/CommandMenu';
 import { SuggestionsDropdown } from './components/SuggestionsDropdown';
@@ -18,8 +19,11 @@ import { QuickActions } from './components/QuickActions';
 import { WorkflowRunner } from './components/WorkflowRunner';
 import { TestCommandsLibrary } from './components/TestCommandsLibrary';
 import { Settings } from './components/Settings';
+import { Onboarding } from './components/Onboarding';
 import { ApprovalCard, ApprovalRequest } from './components/ApprovalCard';
 import { SaveWorkflowButton } from './components/SaveWorkflowButton';
+
+const ONBOARDING_FLAG = 'openmoon.onboardingComplete';
 
 interface AgentStep {
   step: number;
@@ -49,6 +53,7 @@ function App() {
   const [suggestionJustSelected, setSuggestionJustSelected] = useState(false);
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
   const [recordedSteps, setRecordedSteps] = useState<RecordedStep[]>([]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,12 +62,37 @@ function App() {
   const { mcpLoading } = useMcp();
   const { runningApps, allApps, appIcons, appsLoading } = useApps(mcpLoading);
   const { quickNotes, addNote, clearNotes } = useQuickNotes();
+  const { configured: providerConfigured, loading: providerLoading, refresh: refreshProvider } = useProviderStatus();
   const ramUsage = useRamMonitor();
   const { adjustWindowSizeAndPosition } = useWindowManager(
     containerRef,
-    [response, showSuggestions, showCommandMenu, input, filteredSuggestions.length, showTestCommands, showSettings, agentSteps.length, approval, recordedSteps.length],
+    [response, showSuggestions, showCommandMenu, input, filteredSuggestions.length, showTestCommands, showSettings, agentSteps.length, approval, recordedSteps.length, showOnboarding, providerConfigured],
     showWorkflows
   );
+
+  // First-run onboarding: show when not previously completed AND no provider is configured.
+  useEffect(() => {
+    if (providerLoading) return;
+    const completed = localStorage.getItem(ONBOARDING_FLAG) === 'true';
+    if (!completed && !providerConfigured) {
+      setShowOnboarding(true);
+    }
+  }, [providerLoading, providerConfigured]);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem(ONBOARDING_FLAG, 'true');
+    setShowOnboarding(false);
+    refreshProvider();
+  };
+
+  const handleOnboardingSkip = () => {
+    localStorage.setItem(ONBOARDING_FLAG, 'true');
+    setShowOnboarding(false);
+  };
+
+  const openProviderSetup = () => {
+    setShowOnboarding(true);
+  };
 
   // Focus input on mount and after window positioning
   useEffect(() => {
@@ -375,6 +405,13 @@ function App() {
       return;
     }
 
+    // No usable AI provider yet — guide the user to setup instead of failing.
+    if (!providerConfigured) {
+      setShowSuggestions(false);
+      setShowOnboarding(true);
+      return;
+    }
+
     setIsLoading(true);
     setResponse('');
     setAgentSteps([]);
@@ -571,14 +608,23 @@ function App() {
             )}
 
             {showSettings && (
-              <Settings onClose={() => setShowSettings(false)} />
+              <Settings
+                onClose={() => {
+                  setShowSettings(false);
+                  refreshProvider();
+                }}
+              />
+            )}
+
+            {showOnboarding && (
+              <Onboarding onComplete={handleOnboardingComplete} onSkip={handleOnboardingSkip} />
             )}
 
             {mcpLoading || appsLoading ? (
               <McpLoadingIndicator />
             ) : showWorkflows ? (
               <WorkflowRunner onClose={() => setShowWorkflows(false)} />
-            ) : !showCommandMenu && !showTestCommands && !showSettings ? (
+            ) : !showCommandMenu && !showTestCommands && !showSettings && !showOnboarding ? (
               <>
                 <InputField
                   value={input}
@@ -590,6 +636,32 @@ function App() {
                   textareaRef={textareaRef}
                   isLoading={isLoading || mcpLoading || appsLoading}
                 />
+
+                {!providerLoading && !providerConfigured && (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+                    <Sparkles className="h-4 w-4 text-yellow-400/80 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-white/80">No AI provider configured yet</p>
+                      <p className="text-[10px] text-white/50 leading-relaxed mt-0.5">
+                        Connect OpenAI or Ollama to start automating with natural language.
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={openProviderSetup}
+                          className="px-2 py-1 rounded text-[10px] text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
+                        >
+                          Set up provider
+                        </button>
+                        <button
+                          onClick={() => setShowSettings(true)}
+                          className="px-2 py-1 rounded text-[10px] text-white/60 border border-white/10 hover:bg-white/5 transition-colors"
+                        >
+                          Open Settings
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {!input && !response && !showSuggestions && (
                   <QuickActions onActionClick={(prompt) => setInput(prompt)} />
