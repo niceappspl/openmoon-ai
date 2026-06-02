@@ -689,6 +689,46 @@ async fn run_workflow_trigger(
     ))
 }
 
+#[derive(serde::Serialize)]
+struct UpdateInfo {
+    available: bool,
+    version: Option<String>,
+    body: Option<String>,
+}
+
+#[tauri::command]
+async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await.map_err(|e| e.to_string())? {
+        Some(update) => Ok(UpdateInfo {
+            available: true,
+            version: Some(update.version.clone()),
+            body: update.body.clone(),
+        }),
+        None => Ok(UpdateInfo {
+            available: false,
+            version: None,
+            body: None,
+        }),
+    }
+}
+
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "No update available".to_string())?;
+    update
+        .download_and_install(|_chunk, _total| {}, || {})
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn send_prompt(
     prompt: String,
@@ -1491,6 +1531,7 @@ fn main() {
         .manage(Arc::new(LastRunStore::new()))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
 
@@ -1697,7 +1738,9 @@ fn main() {
             permissions::request_permission,
             permissions::open_permission_settings,
             logging::get_log_path,
-            logging::open_logs
+            logging::open_logs,
+            check_for_updates,
+            install_update
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

@@ -301,6 +301,34 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
     invoke('open_logs').catch(() => {});
   };
 
+  const handleCheckForUpdates = () => {
+    setUpdateStatus('checking');
+    setUpdateError(null);
+    setUpdateInfo(null);
+    invoke<{ available: boolean; version: string | null; body: string | null }>('check_for_updates')
+      .then((result) => {
+        if (result.available && result.version) {
+          setUpdateInfo({ version: result.version, body: result.body ?? null });
+          setUpdateStatus('available');
+        } else {
+          setUpdateStatus('up-to-date');
+        }
+      })
+      .catch((err: unknown) => {
+        setUpdateError(typeof err === 'string' ? err : 'Update check failed');
+        setUpdateStatus('error');
+      });
+  };
+
+  const handleInstallUpdate = () => {
+    setUpdateStatus('installing');
+    invoke('install_update')
+      .catch((err: unknown) => {
+        setUpdateError(typeof err === 'string' ? err : 'Install failed');
+        setUpdateStatus('error');
+      });
+  };
+
   useEffect(() => {
     if (activeTab === 'triggers') {
       setTabLoading(true);
@@ -890,6 +918,54 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
               </button>
               {logPath && (
                 <p className="mt-2 text-[10px] text-white/30 leading-relaxed break-all">{logPath}</p>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-white/10">
+              <h3 className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                <Download className="h-3 w-3" />
+                Updates
+              </h3>
+              <p className="text-[10px] text-white/40 mb-2 leading-relaxed">
+                Check for a new version of openMOON.
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleCheckForUpdates}
+                  disabled={updateStatus === 'checking' || updateStatus === 'installing'}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-xs text-white/80 border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {updateStatus === 'checking' ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="h-3 w-3" />
+                  )}
+                  Check for updates
+                </button>
+                {updateStatus === 'available' && updateInfo && (
+                  <button
+                    onClick={handleInstallUpdate}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded text-xs text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
+                  >
+                    <Download className="h-3 w-3" />
+                    Install v{updateInfo.version}
+                  </button>
+                )}
+              </div>
+              {updateStatus === 'up-to-date' && (
+                <p className="mt-2 text-[10px] text-green-400/80">Up to date</p>
+              )}
+              {updateStatus === 'available' && updateInfo && (
+                <p className="mt-2 text-[10px] text-blue-400/80">
+                  Update available: v{updateInfo.version}
+                  {updateInfo.body ? ` — ${updateInfo.body}` : ''}
+                </p>
+              )}
+              {updateStatus === 'installing' && (
+                <p className="mt-2 text-[10px] text-white/50">Downloading and installing…</p>
+              )}
+              {updateStatus === 'error' && updateError && (
+                <p className="mt-2 text-[10px] text-red-400/80">{updateError}</p>
               )}
             </div>
           </div>

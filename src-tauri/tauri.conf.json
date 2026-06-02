@@ -40,6 +40,14 @@
         "scope": ["/Applications/**"]
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/niceappspl/openmoon-ai/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
 
