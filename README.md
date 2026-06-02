@@ -4,9 +4,9 @@
 
 # openMOON AI
 
-### The open-source AI agent for macOS that actually *does* things.
+### Local-first macOS system agent — multi-step tasks on your apps, files & system.
 
-**You say what you want. openMOON figures out the steps and executes them — using your apps, files and system — locally, privately, without the cloud.**
+**MCP host · per-action approval gates · runs locally (Ollama) or with your API key. You delegate; openMOON executes.**
 
 <br/>
 
