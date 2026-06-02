@@ -10,6 +10,8 @@ import { useRamMonitor } from './hooks/useRamMonitor';
 import { useWindowManager } from './hooks/useWindowManager';
 import { useProviderStatus } from './hooks/useProviderStatus';
 import { useHealthCheck } from './hooks/useHealthCheck';
+import { useTokenCount } from './hooks/useTokenCount';
+import { formatCostUsd } from './utils/tokens';
 import { TopBar } from './components/TopBar';
 import { CommandMenu } from './components/CommandMenu';
 import { SuggestionsDropdown } from './components/SuggestionsDropdown';
@@ -66,6 +68,7 @@ function App() {
   const { configured: providerConfigured, loading: providerLoading, refresh: refreshProvider } = useProviderStatus();
   const health = useHealthCheck(!mcpLoading);
   const ramUsage = useRamMonitor();
+  const { tokens, costUsd } = useTokenCount(`${input}${response ? `\n${response}` : ''}`);
   const { adjustWindowSizeAndPosition } = useWindowManager(
     containerRef,
     [response, showSuggestions, showCommandMenu, input, filteredSuggestions.length, showTestCommands, showSettings, agentSteps.length, approval, recordedSteps.length, showOnboarding, providerConfigured],
@@ -641,6 +644,17 @@ function App() {
                   textareaRef={textareaRef}
                   isLoading={isLoading || mcpLoading || appsLoading}
                 />
+
+                {(input.trim() || response) && tokens > 0 && (
+                  <div className="mt-2 flex justify-end">
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/40">
+                      ~{tokens.toLocaleString()} tokens
+                      {costUsd !== null && (
+                        <span className="text-white/30">≈ {formatCostUsd(costUsd)}</span>
+                      )}
+                    </span>
+                  </div>
+                )}
 
                 {!providerLoading && !providerConfigured && (
                   <div className="mt-2 flex items-start gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
