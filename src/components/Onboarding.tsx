@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
-  X, ArrowRight, ArrowLeft, CheckCircle, XCircle, Loader2, Key, Bot, Sparkles, AlertTriangle,
+  X, ArrowRight, ArrowLeft, CheckCircle, Loader2, Key, Bot, Sparkles, AlertTriangle,
   ShieldCheck, Accessibility, Monitor,
 } from 'lucide-react';
 import { usePermissions, type PermissionKind } from '../hooks/usePermissions';
 import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
-import { Button } from './ui';
+import { Button, Spinner, StatusMessage } from './ui';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -235,7 +235,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
                 <div className="bg-white/5 rounded p-2 border border-white/5">
                   {ollamaChecking ? (
                     <div className="flex items-center gap-2 text-[11px] text-white/60">
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Spinner size="xs" />
                       Checking Ollama…
                     </div>
                   ) : ollamaStatus?.running ? (
@@ -300,12 +300,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
               </div>
             )}
 
-            {error && (
-              <div className="flex items-start gap-2 rounded p-2 border border-red-500/20 bg-red-500/10 text-[11px] leading-relaxed text-red-400">
-                <XCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+            {error && <StatusMessage type="error" message={error} />}
           </div>
         );
 

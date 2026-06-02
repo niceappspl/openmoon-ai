@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle, FileText, Gauge, History as HistoryIcon, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { Spinner, EmptyState, StatusMessage } from './ui';
 import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
 
 interface RunRecord {
@@ -258,7 +259,12 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
   const [savingKey, setSavingKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [saveKeySuccess, setSaveKeySuccess] = useState(false);
+  const [tabLoading, setTabLoading] = useState(false);
   const [logPath, setLogPath] = useState('');
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'error'>('idle');
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; body: string | null } | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const [newTrigger, setNewTrigger] = useState<Trigger>({
     id: '',
     name: '',
@@ -297,11 +303,14 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
 
   useEffect(() => {
     if (activeTab === 'triggers') {
-      invoke<Trigger[]>('list_triggers').then(setTriggers).catch(() => {});
+      setTabLoading(true);
+      invoke<Trigger[]>('list_triggers').then(setTriggers).catch(() => {}).finally(() => setTabLoading(false));
     } else if (activeTab === 'audit') {
-      invoke<AuditEntry[]>('get_audit_log', { limit: 100 }).then(setAuditLog).catch(() => {});
+      setTabLoading(true);
+      invoke<AuditEntry[]>('get_audit_log', { limit: 100 }).then(setAuditLog).catch(() => {}).finally(() => setTabLoading(false));
     } else if (activeTab === 'history') {
-      invoke<RunRecord[]>('list_runs', { limit: 50 }).then(setRuns).catch(() => {});
+      setTabLoading(true);
+      invoke<RunRecord[]>('list_runs', { limit: 50 }).then(setRuns).catch(() => {}).finally(() => setTabLoading(false));
     }
   }, [activeTab]);
 
@@ -335,11 +344,14 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
     const key = openaiKeyInput.trim();
     if (!key) return;
     setSavingKey(true);
+    setSaveKeySuccess(false);
     setTestResult(null);
     invoke('set_api_key', { provider: 'openai', key })
       .then(() => {
         setOpenaiKeyInput('');
         refreshKeyStatus();
+        setSaveKeySuccess(true);
+        setTimeout(() => setSaveKeySuccess(false), 2500);
       })
       .catch(() => {})
       .finally(() => setSavingKey(false));
@@ -671,7 +683,7 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
               <div className="bg-white/5 rounded p-2 border border-white/5">
                 {ollamaChecking ? (
                   <div className="flex items-center gap-2 text-[11px] text-white/60">
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Spinner size="xs" />
                     Checking Ollama…
                   </div>
                 ) : ollamaStatus?.running ? (
@@ -801,6 +813,9 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                 <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
                   Stored securely in your macOS keychain — never written to settings.
                 </p>
+                {saveKeySuccess && (
+                  <StatusMessage type="success" message="API key saved." className="mt-2" />
+                )}
               </div>
             )}
 
@@ -814,20 +829,11 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                 {testing ? 'Testing…' : 'Test connection'}
               </button>
               {testResult && (
-                <div
-                  className={`mt-2 flex items-start gap-2 rounded p-2 border text-[11px] leading-relaxed ${
-                    testResult.ok
-                      ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                      : 'border-red-500/20 bg-red-500/10 text-red-400'
-                  }`}
-                >
-                  {testResult.ok ? (
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                  ) : (
-                    <XCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                  )}
-                  <span>{testResult.message}</span>
-                </div>
+                <StatusMessage
+                  type={testResult.ok ? 'success' : 'error'}
+                  message={testResult.message}
+                  className="mt-2"
+                />
               )}
             </div>
 
@@ -1028,9 +1034,13 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
         {activeTab === 'triggers' && (
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="space-y-2">
-              {triggers.length === 0 && (
-                <p className="text-[11px] text-white/40">No triggers yet. Add one below.</p>
-              )}
+              {tabLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Spinner size="sm" className="text-white/30" />
+                </div>
+              ) : triggers.length === 0 ? (
+                <EmptyState icon={Clock} message="No triggers yet. Add one below." />
+              ) : null}
               {triggers.map((trigger) => (
                 <div key={trigger.id} className="bg-white/5 border border-white/10 rounded-lg p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -1128,8 +1138,12 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
 
         {activeTab === 'audit' && (
           <div className="flex-1 overflow-y-auto p-4">
-            {auditLog.length === 0 ? (
-              <p className="text-[11px] text-white/40">No audit entries yet.</p>
+            {tabLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Spinner size="sm" className="text-white/30" />
+              </div>
+            ) : auditLog.length === 0 ? (
+              <EmptyState icon={ScrollText} message="No audit entries yet." />
             ) : (
               <div className="space-y-1">
                 {auditLog.map((entry, index) => (
@@ -1152,8 +1166,12 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
 
         {activeTab === 'history' && (
           <div className="flex-1 overflow-y-auto p-4">
-            {runs.length === 0 ? (
-              <p className="text-[11px] text-white/40">No session history yet. Completed agent runs will appear here.</p>
+            {tabLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Spinner size="sm" className="text-white/30" />
+              </div>
+            ) : runs.length === 0 ? (
+              <EmptyState icon={HistoryIcon} message="No session history yet. Completed agent runs will appear here." />
             ) : (
               <div className="space-y-2">
                 {runs.map((run) => {
