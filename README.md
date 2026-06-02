@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🌙 openMOON
+<img src="src-tauri/icons/icon.png" alt="openMOON" width="120"/>
+
+# openMOON
 
 ### The open-source AI agent for macOS that actually *does* things.
 
@@ -16,13 +18,6 @@
 [![CI](https://github.com/niceappspl/openmoon/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/niceappspl/openmoon/actions)
 
 <br/>
-
-<!-- Add a screenshot or demo GIF here — it makes a huge difference!
-     Tip: record with Kap (kap.app) and drop the GIF into this folder as docs/demo.gif -->
-
-<!--
-<img src="docs/demo.gif" alt="openMOON demo" width="680"/>
--->
 
 [Quick Start](#-quick-start) · [Features](#-features) · [MCP Servers](MCP.md) · [Architecture](#-architecture) · [Contributing](#-contributing) · [Roadmap](ROADMAP.md)
 
