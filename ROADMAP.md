@@ -2,6 +2,8 @@
 
 > Direction document: **what** we are building, **in what order**.
 > The product **why** and the strategic bets live in [VISION.md](VISION.md) — read that first.
+> The **full task breakdown** (workstreams, dependencies, per-task effort) is in
+> [docs/execution-plan.md](docs/execution-plan.md).
 > One goal: make openMOON the local AI agent that genuinely works on your behalf.
 
 ---

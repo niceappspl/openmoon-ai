@@ -6,6 +6,7 @@ Thank you for your interest in contributing! openMOON is an open-source project 
 
 - **[VISION.md](VISION.md)** — what openMOON is, the three pillars, and the anti-goals. Every change should serve a pillar or bet.
 - **[ROADMAP.md](ROADMAP.md)** — phase plan and what's already done.
+- **[docs/execution-plan.md](docs/execution-plan.md)** — the full task breakdown by workstream, with dependencies, effort, and which tasks are good first issues. Pick your task here.
 - **[docs/platform-and-prompt-architecture.md](docs/platform-and-prompt-architecture.md)** — the target shape for the agent prompt and cross-platform boundary. Build toward this, not the current debt.
 
 > The fastest way to get a PR merged: pick an issue, comment that you're taking it, and check it against the pillars in VISION.md before writing code.
