@@ -1,10 +1,21 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle, FileText, Gauge } from 'lucide-react';
+import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle, FileText, Gauge, History as HistoryIcon, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
+
+interface RunRecord {
+  id: number;
+  prompt: string;
+  response: string;
+  stepsJson: string;
+  createdAt: string;
+  provider: string;
+  model: string;
+}
 
 interface SettingsProps {
   onClose: () => void;
+  onReplay?: (prompt: string) => void;
 }
 
 type PolicyValue = 'auto' | 'ask' | 'deny';
@@ -228,12 +239,14 @@ const ToolCallingBadge = ({ model }: { model: string }) => {
   );
 };
 
-export const Settings = ({ onClose }: SettingsProps) => {
-  const [activeTab, setActiveTab] = useState<'permissions' | 'general' | 'security' | 'triggers' | 'audit'>('permissions');
+export const Settings = ({ onClose, onReplay }: SettingsProps) => {
+  const [activeTab, setActiveTab] = useState<'permissions' | 'general' | 'security' | 'triggers' | 'audit' | 'history'>('permissions');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [triggers, setTriggers] = useState<Trigger[]>([]);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [runs, setRuns] = useState<RunRecord[]>([]);
+  const [expandedRunId, setExpandedRunId] = useState<number | null>(null);
   const [newOverrideTool, setNewOverrideTool] = useState('');
   const [newAllowedPath, setNewAllowedPath] = useState('');
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
@@ -287,6 +300,8 @@ export const Settings = ({ onClose }: SettingsProps) => {
       invoke<Trigger[]>('list_triggers').then(setTriggers).catch(() => {});
     } else if (activeTab === 'audit') {
       invoke<AuditEntry[]>('get_audit_log', { limit: 100 }).then(setAuditLog).catch(() => {});
+    } else if (activeTab === 'history') {
+      invoke<RunRecord[]>('list_runs', { limit: 50 }).then(setRuns).catch(() => {});
     }
   }, [activeTab]);
 
@@ -502,6 +517,17 @@ export const Settings = ({ onClose }: SettingsProps) => {
         >
           <ScrollText className="h-3 w-3" />
           Audit
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
+            activeTab === 'history'
+              ? 'text-white border-b-2 border-blue-500 bg-white/5'
+              : 'text-white/60 hover:text-white/80'
+          }`}
+        >
+          <HistoryIcon className="h-3 w-3" />
+          History
         </button>
       </div>
 
@@ -1119,6 +1145,94 @@ export const Settings = ({ onClose }: SettingsProps) => {
                     <span className="text-white/30 flex-shrink-0">{entry.timestamp}</span>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="flex-1 overflow-y-auto p-4">
+            {runs.length === 0 ? (
+              <p className="text-[11px] text-white/40">No session history yet. Completed agent runs will appear here.</p>
+            ) : (
+              <div className="space-y-2">
+                {runs.map((run) => {
+                  const isExpanded = expandedRunId === run.id;
+                  const steps: { action: string; params: Record<string, unknown> }[] = (() => {
+                    try { return JSON.parse(run.stepsJson) as { action: string; params: Record<string, unknown> }[]; } catch { return []; }
+                  })();
+                  return (
+                    <div key={run.id} className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+                      {/* Row header */}
+                      <button
+                        onClick={() => setExpandedRunId(isExpanded ? null : run.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors"
+                      >
+                        {isExpanded
+                          ? <ChevronDown className="h-3 w-3 text-white/40 flex-shrink-0" />
+                          : <ChevronRight className="h-3 w-3 text-white/40 flex-shrink-0" />}
+                        <span className="flex-1 text-[11px] text-white/80 truncate">{run.prompt}</span>
+                        <span className="text-[10px] text-white/30 flex-shrink-0 mr-1">
+                          {run.provider}/{run.model}
+                        </span>
+                        <span className="text-[10px] text-white/30 flex-shrink-0">{run.createdAt}</span>
+                      </button>
+
+                      {/* Expanded detail */}
+                      {isExpanded && (
+                        <div className="px-3 pb-3 space-y-2 border-t border-white/10">
+                          <div className="pt-2">
+                            <p className="text-[10px] text-white/50 mb-1 font-medium uppercase tracking-wide">Prompt</p>
+                            <p className="text-[11px] text-white/80 whitespace-pre-wrap leading-relaxed">{run.prompt}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-white/50 mb-1 font-medium uppercase tracking-wide">Response</p>
+                            <p className="text-[11px] text-white/70 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">{run.response}</p>
+                          </div>
+                          {steps.length > 0 && (
+                            <div>
+                              <p className="text-[10px] text-white/50 mb-1 font-medium uppercase tracking-wide">
+                                Tool calls ({steps.length})
+                              </p>
+                              <div className="space-y-1">
+                                {steps.map((step, i) => (
+                                  <div key={i} className="flex items-start gap-2 text-[10px] bg-black/30 rounded px-2 py-1">
+                                    <span className="text-blue-400 font-medium flex-shrink-0">{step.action}</span>
+                                    <span className="text-white/40 truncate">
+                                      {JSON.stringify(step.params)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 pt-1">
+                            {onReplay && (
+                              <button
+                                onClick={() => { onReplay(run.prompt); onClose(); }}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                Replay
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                invoke('delete_run', { id: run.id })
+                                  .then(() => setRuns((prev) => prev.filter((r) => r.id !== run.id)))
+                                  .catch(() => {});
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Activity, RefreshCw } from 'lucide-react';
+import { Button } from './ui';
 import type { HealthStatus } from '../hooks/useHealthCheck';
 
 interface HealthBadgeProps {
@@ -110,13 +111,15 @@ export const HealthBadge = ({
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] text-white/80">{row.label}</span>
                     {row.fix && (
-                      <button
+                      <Button
                         type="button"
+                        variant="primary"
+                        size="sm"
+                        className="text-[9px] px-1.5 py-0.5"
                         onClick={row.fix.action}
-                        className="px-1.5 py-0.5 rounded text-[9px] text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
                       >
                         {row.fix.label}
-                      </button>
+                      </Button>
                     )}
                   </div>
                   <p className="text-[9px] text-white/45 leading-relaxed truncate">{row.message}</p>

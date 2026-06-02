@@ -4,6 +4,17 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --om-accent-from: #FF8918;
+  --om-accent-to: #A22904;
+  --om-surface: rgba(255, 255, 255, 0.05);
+  --om-surface-high: rgba(255, 255, 255, 0.10);
+  --om-border: rgba(255, 255, 255, 0.10);
+  --om-border-faint: rgba(255, 255, 255, 0.05);
+  --om-bg-glass: rgba(0, 0, 0, 0.90);
+  --om-bg-glass-heavy: rgba(0, 0, 0, 0.95);
+}
+
 @layer base {
   body {
     @apply text-white antialiased;

@@ -1,4 +1,6 @@
 import { ShieldAlert, Check, X } from 'lucide-react';
+import { Button, Badge } from './ui';
+import type { BadgeVariant } from './ui';
 
 export interface ApprovalRequest {
   id: string;
@@ -12,15 +14,15 @@ interface ApprovalCardProps {
   onDecision: (id: string, approved: boolean) => void;
 }
 
-const RISK_STYLES: Record<string, string> = {
-  high: 'text-red-400 bg-red-500/15 border-red-500/30',
-  medium: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
-  low: 'text-blue-400 bg-blue-500/15 border-blue-500/30',
-  unknown: 'text-white/60 bg-white/10 border-white/20',
+const RISK_TO_BADGE_VARIANT: Record<string, BadgeVariant> = {
+  high: 'danger',
+  medium: 'warn',
+  low: 'neutral',
+  unknown: 'neutral',
 };
 
 export const ApprovalCard = ({ request, onDecision }: ApprovalCardProps) => {
-  const riskClass = RISK_STYLES[request.risk] ?? RISK_STYLES.unknown;
+  const riskVariant = RISK_TO_BADGE_VARIANT[request.risk] ?? 'neutral';
   const argsText = JSON.stringify(request.args ?? {}, null, 2);
 
   return (
@@ -30,9 +32,7 @@ export const ApprovalCard = ({ request, onDecision }: ApprovalCardProps) => {
           <ShieldAlert className="h-4 w-4 text-yellow-400" />
           <span className="text-xs font-medium text-white/90">Approval required</span>
         </div>
-        <span className={`px-1.5 py-0.5 text-[10px] rounded border ${riskClass}`}>
-          {request.risk} risk
-        </span>
+        <Badge variant={riskVariant}>{request.risk} risk</Badge>
       </div>
 
       <p className="text-xs text-white/70 mb-1">
@@ -43,20 +43,14 @@ export const ApprovalCard = ({ request, onDecision }: ApprovalCardProps) => {
       </pre>
 
       <div className="flex gap-2 mt-3">
-        <button
-          onClick={() => onDecision(request.id, true)}
-          className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 transition-colors"
-        >
+        <Button variant="success" size="md" className="flex-1" onClick={() => onDecision(request.id, true)}>
           <Check className="h-3 w-3" />
           Approve
-        </button>
-        <button
-          onClick={() => onDecision(request.id, false)}
-          className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors"
-        >
+        </Button>
+        <Button variant="danger" size="md" className="flex-1" onClick={() => onDecision(request.id, false)}>
           <X className="h-3 w-3" />
           Reject
-        </button>
+        </Button>
       </div>
     </div>
   );

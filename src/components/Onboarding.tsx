@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { usePermissions, type PermissionKind } from '../hooks/usePermissions';
 import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
+import { Button } from './ui';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -465,23 +466,21 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
 
       {/* Footer */}
       <div className="px-3 py-2 border-t border-white/10 bg-black/50 flex items-center justify-between">
-        <button
+        <Button
+          variant="ghost"
+          size="md"
           onClick={goBack}
           disabled={stepIndex === 0 || validating}
-          className="flex items-center gap-1 px-2 py-1.5 rounded text-xs text-white/60 hover:text-white/90 hover:bg-white/5 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+          className="disabled:opacity-30"
         >
           <ArrowLeft className="h-3 w-3" />
           Back
-        </button>
-        <button
-          onClick={handlePrimary}
-          disabled={validating}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="primary" size="md" onClick={handlePrimary} disabled={validating}>
           {validating ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
           {isLastStep ? 'Get started' : isProviderStep ? (validating ? 'Testing…' : 'Test & continue') : 'Continue'}
           {!isLastStep && !validating ? <ArrowRight className="h-3 w-3" /> : null}
-        </button>
+        </Button>
       </div>
     </div>
   );
