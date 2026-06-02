@@ -5,6 +5,7 @@ import {
   ShieldCheck, Accessibility, Monitor,
 } from 'lucide-react';
 import { usePermissions, type PermissionKind } from '../hooks/usePermissions';
+import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -262,7 +263,9 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
                     >
                       <option value="" className="bg-black">Select installed model…</option>
                       {ollamaStatus.models.map((m) => (
-                        <option key={m} value={m} className="bg-black">{m}</option>
+                        <option key={m} value={m} className="bg-black">
+                          {m}{supportsToolCalling(m) ? ' · tools ✓' : ''}
+                        </option>
                       ))}
                     </select>
                   ) : (
@@ -274,8 +277,23 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
                       className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
                     />
                   )}
+                  {model.trim() !== '' && (
+                    <div className="mt-2">
+                      {supportsToolCalling(model) ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-green-400">
+                          <CheckCircle className="h-3 w-3" />
+                          tools ✓
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400/90">
+                          <AlertTriangle className="h-3 w-3" />
+                          tools unknown — may not support tool calling
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
-                    Tool-calling requires a tool-capable model (e.g. llama3.1, qwen2.5).
+                    Tool-calling requires a tool-capable model. Recommended: {RECOMMENDED_TOOL_MODELS.join(', ')}.
                   </p>
                 </div>
               </div>

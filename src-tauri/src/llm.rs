@@ -563,6 +563,20 @@ impl OllamaProvider {
     }
 }
 
+/// Maps Ollama's characteristic "model does not support tools" failure into an
+/// actionable message. Returns `None` for unrelated errors so the caller can
+/// surface the raw detail.
+fn tool_support_error(model: &str, detail: &str) -> Option<String> {
+    if detail.to_lowercase().contains("does not support tools") {
+        Some(format!(
+            "Model '{}' doesn't support tool calling — pick a compatible model like llama3.1 or qwen2.5.",
+            model
+        ))
+    } else {
+        None
+    }
+}
+
 fn to_ollama_messages(messages: &[ProviderMessage]) -> Vec<serde_json::Value> {
     messages
         .iter()
@@ -658,6 +672,9 @@ impl LlmProvider for OllamaProvider {
                 .as_str()
                 .unwrap_or("unknown error")
                 .to_string();
+            if let Some(message) = tool_support_error(&self.model, &detail) {
+                return Err(message);
+            }
             return Err(format!("Ollama error ({}): {}", status, detail));
         }
 

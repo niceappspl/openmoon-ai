@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug } from 'lucide-react';
+import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle } from 'lucide-react';
+import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
 
 interface SettingsProps {
   onClose: () => void;
@@ -206,6 +207,21 @@ const CATEGORIES = {
   network: { name: 'Network', icon: Wifi },
   media: { name: 'Media', icon: Music },
   automation: { name: 'Automation', icon: Bot }
+};
+
+const ToolCallingBadge = ({ model }: { model: string }) => {
+  const supported = supportsToolCalling(model);
+  return supported ? (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-green-400 bg-green-500/10 border border-green-500/20">
+      <Wrench className="h-2.5 w-2.5" />
+      tools ✓
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20">
+      <HelpCircle className="h-2.5 w-2.5" />
+      tools unknown
+    </span>
+  );
 };
 
 export const Settings = ({ onClose }: SettingsProps) => {
@@ -644,7 +660,9 @@ export const Settings = ({ onClose }: SettingsProps) => {
                 >
                   <option value="" className="bg-black">Select installed model…</option>
                   {ollamaStatus.models.map((model) => (
-                    <option key={model} value={model} className="bg-black">{model}</option>
+                    <option key={model} value={model} className="bg-black">
+                      {model}{supportsToolCalling(model) ? ' · tools ✓' : ''}
+                    </option>
                   ))}
                 </select>
               )}
@@ -655,9 +673,19 @@ export const Settings = ({ onClose }: SettingsProps) => {
                 placeholder={DEFAULT_MODELS[settings.provider] ?? ''}
                 className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
               />
+              {settings.provider === 'ollama' && settings.model.trim() !== '' && (
+                <div className="mt-2 flex items-center gap-2">
+                  <ToolCallingBadge model={settings.model} />
+                  {!supportsToolCalling(settings.model) && (
+                    <span className="text-[10px] text-white/40 leading-relaxed">
+                      heuristic — may still work, but tool calling isn’t guaranteed.
+                    </span>
+                  )}
+                </div>
+              )}
               {settings.provider === 'ollama' && (
                 <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
-                  Tool-calling requires a tool-capable model (e.g. llama3.1, qwen2.5). Models without tool support will return an error.
+                  Tool-calling requires a tool-capable model. Recommended: {RECOMMENDED_TOOL_MODELS.join(', ')}. Models without tool support will return an error.
                 </p>
               )}
               {settings.provider === 'ollama' && ollamaStatus?.running && settings.model.trim() !== '' && !ollamaStatus.models.includes(settings.model) && (
