@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2 } from 'lucide-react';
+import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug } from 'lucide-react';
 
 interface SettingsProps {
   onClose: () => void;
@@ -220,6 +220,11 @@ export const Settings = ({ onClose }: SettingsProps) => {
   const [ollamaChecking, setOllamaChecking] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [pullMessage, setPullMessage] = useState<string | null>(null);
+  const [openaiKeyInput, setOpenaiKeyInput] = useState('');
+  const [openaiKeySet, setOpenaiKeySet] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [newTrigger, setNewTrigger] = useState<Trigger>({
     id: '',
     name: '',
@@ -234,6 +239,16 @@ export const Settings = ({ onClose }: SettingsProps) => {
     invoke<AppSettings>('get_settings')
       .then((loaded) => setSettings({ ...DEFAULT_SETTINGS, ...loaded, security: { ...DEFAULT_SECURITY, ...loaded.security } }))
       .catch(() => {});
+  }, []);
+
+  const refreshKeyStatus = () => {
+    invoke<boolean>('has_api_key_cmd', { provider: 'openai' })
+      .then(setOpenaiKeySet)
+      .catch(() => setOpenaiKeySet(false));
+  };
+
+  useEffect(() => {
+    refreshKeyStatus();
   }, []);
 
   useEffect(() => {
@@ -270,6 +285,40 @@ export const Settings = ({ onClose }: SettingsProps) => {
       .finally(() => setPulling(false));
   };
 
+  const handleSaveKey = () => {
+    const key = openaiKeyInput.trim();
+    if (!key) return;
+    setSavingKey(true);
+    setTestResult(null);
+    invoke('set_api_key', { provider: 'openai', key })
+      .then(() => {
+        setOpenaiKeyInput('');
+        refreshKeyStatus();
+      })
+      .catch(() => {})
+      .finally(() => setSavingKey(false));
+  };
+
+  const handleClearKey = () => {
+    setTestResult(null);
+    invoke('remove_api_key', { provider: 'openai' })
+      .then(refreshKeyStatus)
+      .catch(() => {});
+  };
+
+  const handleTestConnection = () => {
+    setTesting(true);
+    setTestResult(null);
+    invoke<string>('test_provider_connection', {
+      provider: settings.provider,
+      model: settings.model,
+      ollamaBaseUrl: settings.ollamaBaseUrl,
+    })
+      .then((message) => setTestResult({ ok: true, message }))
+      .catch((error) => setTestResult({ ok: false, message: String(error) }))
+      .finally(() => setTesting(false));
+  };
+
   const persistSettings = (next: AppSettings) => {
     setSettings(next);
     invoke('save_settings', { settings: next }).catch(() => {});
@@ -280,6 +329,7 @@ export const Settings = ({ onClose }: SettingsProps) => {
   };
 
   const handleProviderChange = (provider: string) => {
+    setTestResult(null);
     persistSettings({ ...settings, provider, model: DEFAULT_MODELS[provider] ?? settings.model });
   };
 
@@ -641,15 +691,76 @@ export const Settings = ({ onClose }: SettingsProps) => {
             )}
 
             {settings.provider === 'openai' && (
-              <div className="bg-white/5 rounded p-2 border border-white/5">
-                <div className="flex items-start gap-2">
-                  <Info className="h-3 w-3 text-blue-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-[10px] text-white/50 leading-relaxed">
-                    OpenAI uses the <span className="font-medium text-blue-400">OPENAI_API_KEY</span> environment variable.
+              <div>
+                <label className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                  <Key className="h-3 w-3" />
+                  OpenAI API Key
+                </label>
+                {openaiKeySet && (
+                  <div className="flex items-center justify-between gap-2 mb-2 bg-white/5 rounded p-2 border border-white/5">
+                    <div className="flex items-center gap-2 text-[11px] text-green-400">
+                      <CheckCircle className="h-3 w-3" />
+                      API key configured
+                    </div>
+                    <button
+                      onClick={handleClearKey}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Clear
+                    </button>
                   </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={openaiKeyInput}
+                    onChange={(e) => setOpenaiKeyInput(e.target.value)}
+                    placeholder={openaiKeySet ? 'Enter a new key to replace…' : 'sk-…'}
+                    className="flex-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+                  />
+                  <button
+                    onClick={handleSaveKey}
+                    disabled={savingKey || openaiKeyInput.trim() === ''}
+                    className="flex items-center gap-1 px-3 py-2 rounded text-xs text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors disabled:opacity-40"
+                  >
+                    {savingKey ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                    Save
+                  </button>
                 </div>
+                <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
+                  Stored securely in your macOS keychain — never written to settings.
+                </p>
               </div>
             )}
+
+            <div>
+              <button
+                onClick={handleTestConnection}
+                disabled={testing}
+                className="flex items-center gap-1.5 px-3 py-2 rounded text-xs text-white/80 border border-white/15 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50"
+              >
+                {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plug className="h-3 w-3" />}
+                {testing ? 'Testing…' : 'Test connection'}
+              </button>
+              {testResult && (
+                <div
+                  className={`mt-2 flex items-start gap-2 rounded p-2 border text-[11px] leading-relaxed ${
+                    testResult.ok
+                      ? 'border-green-500/20 bg-green-500/10 text-green-400'
+                      : 'border-red-500/20 bg-red-500/10 text-red-400'
+                  }`}
+                >
+                  {testResult.ok ? (
+                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <XCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                  )}
+                  <span>{testResult.message}</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

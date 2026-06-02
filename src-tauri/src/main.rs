@@ -757,6 +757,63 @@ fn save_settings(settings: settings::AppSettings) -> Result<(), String> {
     settings::save(&settings)
 }
 
+/// Validates that the selected provider is reachable and usable before the user
+/// relies on it. For OpenAI it performs a lightweight `GET /v1/models` with the
+/// stored key (save the key first), mapping common failures to actionable
+/// messages. For Ollama it probes the base URL and confirms the model is
+/// installed. Returns a human-readable success message or a fixable error.
+#[tauri::command]
+async fn test_provider_connection(
+    provider: String,
+    model: String,
+    ollama_base_url: String,
+) -> Result<String, String> {
+    match provider.as_str() {
+        "ollama" => {
+            let base = {
+                let trimmed = ollama_base_url.trim();
+                if trimmed.is_empty() {
+                    "http://localhost:11434".to_string()
+                } else {
+                    trimmed.to_string()
+                }
+            };
+            let model = model.trim();
+            if model.is_empty() {
+                return Err("Select a model first".to_string());
+            }
+            let status = ollama::ollama_status(Some(base.clone())).await?;
+            if !status.running {
+                return Err(format!("Ollama not reachable at {}", base));
+            }
+            if !status.models.iter().any(|m| m == model) {
+                return Err(format!("Model '{}' not installed — pull it first", model));
+            }
+            Ok(format!("Ollama reachable — model '{}' installed", model))
+        }
+        _ => {
+            let api_key = secrets::get_api_key("openai")
+                .ok_or_else(|| "No OpenAI API key configured. Save a key first.".to_string())?;
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+            let response = client
+                .get("https://api.openai.com/v1/models")
+                .bearer_auth(&api_key)
+                .send()
+                .await
+                .map_err(|e| format!("Network error reaching OpenAI: {}", e))?;
+            match response.status().as_u16() {
+                200 => Ok("OpenAI reachable".to_string()),
+                401 => Err("Invalid API key".to_string()),
+                429 => Err("OpenAI rate limit reached — try again shortly".to_string()),
+                code => Err(format!("OpenAI returned HTTP {}", code)),
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn get_notes() -> Result<Vec<String>, String> {
     db::get_notes()
@@ -1486,6 +1543,7 @@ fn main() {
             reset_session,
             get_settings,
             save_settings,
+            test_provider_connection,
             secrets::set_api_key,
             secrets::remove_api_key,
             secrets::has_api_key_cmd,
