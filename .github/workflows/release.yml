@@ -1,0 +1,92 @@
+# Release workflow — builds, signs/notarises, and publishes a .dmg GitHub Release.
+#
+# Triggers automatically on version tags (v*.*.*) and supports manual runs.
+#
+# Optional Apple notarisation secrets (set in repo Settings → Secrets → Actions).
+# Without them the workflow succeeds and produces an unsigned .dmg.
+#
+#   APPLE_CERTIFICATE          — base64-encoded Developer ID Application .p12 cert
+#   APPLE_CERTIFICATE_PASSWORD — .p12 export password
+#   APPLE_SIGNING_IDENTITY     — e.g. "Developer ID Application: Your Name (TEAMID)"
+#   APPLE_ID                   — Apple ID email used for notarisation
+#   APPLE_PASSWORD             — app-specific password for APPLE_ID
+#   APPLE_TEAM_ID              — 10-character Apple Developer Team ID
+#
+# TODO: add updater.pubkey for auto-update (#83)
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to release (e.g. v1.0.1). Creates a draft release.'
+        required: false
+        default: 'v0.0.0-manual'
+
+jobs:
+  release:
+    name: Build & Release (macOS)
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-
+
+      - name: Install Bun (required for apple-mcp)
+        run: brew install oven-sh/bun/bun
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build, bundle, and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_INCREMENTAL: "0"
+          # Apple signing/notarisation — silently skipped when secrets are absent
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
+          releaseName: 'openMOON ${{ github.event_name == ''push'' && github.ref_name || github.event.inputs.tag }}'
+          releaseBody: |
+            ## openMOON ${{ github.ref_name }}
+
+            ### Installation
+            1. Download `openMOON_*.dmg` below.
+            2. Open the .dmg, drag **openMOON.app** to `/Applications`.
+            3. Set your OpenAI API key in the app settings.
+
+            > **Note:** If macOS shows "unidentified developer", right-click → Open the first time (unsigned build).
+          releaseDraft: ${{ github.event_name == 'workflow_dispatch' }}
+          prerelease: false
+          includeUpdaterJson: false
