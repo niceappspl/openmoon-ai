@@ -1,6 +1,11 @@
+import { lazy, Suspense, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+const CodeBlock = lazy(() =>
+  import('./CodeBlock').then((m) => ({ default: m.CodeBlock }))
+);
 
 interface ResponseDisplayProps {
   response: string;
@@ -15,18 +20,27 @@ export const ResponseDisplay = ({ response, onClear }: ResponseDisplayProps) => 
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-              code: ({node, inline, className, children, ...props}: any) => {
-                return inline ? (
-                  <code className="bg-white/10 border border-white/20 px-1 py-0.5 rounded text-white/80" {...props}>
-                    {children}
-                  </code>
+              code: ({className, children}: {className?: string; children?: ReactNode}) => {
+                const text = String(children ?? '');
+                const match = /language-(\w+)/.exec(className ?? '');
+                const isBlock = match !== null || text.includes('\n');
+                return isBlock ? (
+                  <Suspense
+                    fallback={
+                      <pre className="my-2 p-3 rounded-lg bg-black/40 border border-white/10 text-xs overflow-x-auto">
+                        {text}
+                      </pre>
+                    }
+                  >
+                    <CodeBlock code={text.replace(/\n$/, '')} language={match?.[1]} />
+                  </Suspense>
                 ) : (
-                  <code className="block bg-white/10 p-2 rounded my-2 text-xs overflow-x-auto border border-white/10" {...props}>
+                  <code className="bg-white/10 border border-white/20 px-1 py-0.5 rounded text-white/80">
                     {children}
                   </code>
                 );
               },
-              pre: ({children}: any) => <div className="my-2">{children}</div>,
+              pre: ({children}: {children?: ReactNode}) => <>{children}</>,
               a: ({children, href}: any) => (
                 <a href={href} className="text-white/80 hover:text-white underline" target="_blank" rel="noopener noreferrer">
                   {children}
