@@ -945,14 +945,8 @@ async fn health_check(
     )
     .await
     {
-        Ok(Ok(message)) => ProbeResult {
-            ok: true,
-            message,
-        },
-        Ok(Err(message)) => ProbeResult {
-            ok: false,
-            message,
-        },
+        Ok(Ok(message)) => ProbeResult { ok: true, message },
+        Ok(Err(message)) => ProbeResult { ok: false, message },
         Err(_) => ProbeResult {
             ok: false,
             message: "Provider check timed out".to_string(),
