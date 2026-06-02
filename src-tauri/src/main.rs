@@ -758,18 +758,17 @@ fn save_settings(settings: settings::AppSettings) -> Result<(), String> {
     settings::save(&settings)
 }
 
-/// Validates that the selected provider is reachable and usable before the user
-/// relies on it. For OpenAI it performs a lightweight `GET /v1/models` with the
-/// stored key (save the key first), mapping common failures to actionable
-/// messages. For Ollama it probes the base URL and confirms the model is
-/// installed. Returns a human-readable success message or a fixable error.
-#[tauri::command]
-async fn test_provider_connection(
-    provider: String,
-    model: String,
-    ollama_base_url: String,
+/// Probes that the selected provider is reachable and usable. For OpenAI it
+/// performs a lightweight `GET /v1/models` with the stored key, mapping common
+/// failures to actionable messages. For Ollama it probes the base URL and
+/// confirms the model is installed. Returns a human-readable success message or
+/// a fixable error. Shared by `test_provider_connection` and `health_check`.
+async fn probe_provider(
+    provider: &str,
+    model: &str,
+    ollama_base_url: &str,
 ) -> Result<String, String> {
-    match provider.as_str() {
+    match provider {
         "ollama" => {
             let base = {
                 let trimmed = ollama_base_url.trim();
@@ -813,6 +812,77 @@ async fn test_provider_connection(
             }
         }
     }
+}
+
+/// Validates that the selected provider is reachable and usable before the user
+/// relies on it. Returns a human-readable success message or a fixable error.
+#[tauri::command]
+async fn test_provider_connection(
+    provider: String,
+    model: String,
+    ollama_base_url: String,
+) -> Result<String, String> {
+    probe_provider(&provider, &model, &ollama_base_url).await
+}
+
+/// Outcome of a single readiness probe surfaced in the startup health check.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProbeResult {
+    ok: bool,
+    message: String,
+}
+
+/// Aggregated startup readiness reported to the UI health indicator.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HealthStatus {
+    provider: ProbeResult,
+    mcp: mcp_multi::McpHealth,
+    permissions: permissions::PermissionStatus,
+}
+
+/// Aggregates startup readiness: provider reachability (best-effort, short
+/// timeout so the call returns promptly even when offline), MCP host status
+/// (servers started / tools available) and macOS permission grants.
+#[tauri::command]
+async fn health_check(
+    state: tauri::State<'_, Arc<mcp_multi::McpManager>>,
+) -> Result<HealthStatus, String> {
+    let app_settings = settings::load();
+
+    let provider = match tokio::time::timeout(
+        std::time::Duration::from_secs(8),
+        probe_provider(
+            &app_settings.provider,
+            &app_settings.model,
+            &app_settings.ollama_base_url,
+        ),
+    )
+    .await
+    {
+        Ok(Ok(message)) => ProbeResult {
+            ok: true,
+            message,
+        },
+        Ok(Err(message)) => ProbeResult {
+            ok: false,
+            message,
+        },
+        Err(_) => ProbeResult {
+            ok: false,
+            message: "Provider check timed out".to_string(),
+        },
+    };
+
+    let mcp = state.status().await;
+    let permissions = permissions::check_permissions();
+
+    Ok(HealthStatus {
+        provider,
+        mcp,
+        permissions,
+    })
 }
 
 #[tauri::command]
@@ -1545,6 +1615,7 @@ fn main() {
             get_settings,
             save_settings,
             test_provider_connection,
+            health_check,
             secrets::set_api_key,
             secrets::remove_api_key,
             secrets::has_api_key_cmd,

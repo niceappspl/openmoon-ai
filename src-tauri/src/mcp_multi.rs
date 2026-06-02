@@ -31,6 +31,18 @@ pub struct McpError {
     pub message: String,
 }
 
+/// Lightweight readiness snapshot of the MCP host for the startup health check.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpHealth {
+    /// Number of servers registered from the config.
+    pub servers_total: usize,
+    /// Number of servers currently started (stdio child alive / http selected).
+    pub servers_started: usize,
+    /// Number of tools advertised across started servers (from the route cache).
+    pub tools: usize,
+}
+
 /// HTTP request timeout for remote MCP servers. The stdio path keeps its own
 /// 10s line-read timeout; both surface the same "Request timeout" error.
 const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -350,6 +362,15 @@ impl McpServer {
             .map_err(|e| format!("Failed to parse response: {} | Body: {}", e, payload))
     }
 
+    /// Whether this server is considered started: a live stdio child process,
+    /// or an http transport with an established session.
+    pub async fn is_running(&self) -> bool {
+        match &self.transport {
+            Transport::Stdio(inner) => inner.child.lock().await.is_some(),
+            Transport::Http(inner) => inner.session_id.lock().await.is_some(),
+        }
+    }
+
     pub async fn stop(&self) -> Result<(), String> {
         match &self.transport {
             Transport::Stdio(inner) => {
@@ -466,6 +487,30 @@ impl McpManager {
         }
 
         Ok(format!("MCP Servers started:\n{}", started.join("\n")))
+    }
+
+    /// Reports a fast readiness snapshot without issuing new tool listings:
+    /// counts registered/started servers and the cached advertised tool count.
+    pub async fn status(&self) -> McpHealth {
+        let (servers_total, servers_started) = {
+            let servers_guard = self.servers.lock().await;
+            let total = servers_guard.len();
+            let mut started = 0;
+            for server in servers_guard.values() {
+                if server.is_running().await {
+                    started += 1;
+                }
+            }
+            (total, started)
+        };
+
+        let tools = self.tool_routes.lock().await.len();
+
+        McpHealth {
+            servers_total,
+            servers_started,
+            tools,
+        }
     }
 
     pub async fn stop_all(&self) -> Result<(), String> {

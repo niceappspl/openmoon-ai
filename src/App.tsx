@@ -9,6 +9,7 @@ import { useQuickNotes } from './hooks/useQuickNotes';
 import { useRamMonitor } from './hooks/useRamMonitor';
 import { useWindowManager } from './hooks/useWindowManager';
 import { useProviderStatus } from './hooks/useProviderStatus';
+import { useHealthCheck } from './hooks/useHealthCheck';
 import { TopBar } from './components/TopBar';
 import { CommandMenu } from './components/CommandMenu';
 import { SuggestionsDropdown } from './components/SuggestionsDropdown';
@@ -63,6 +64,7 @@ function App() {
   const { runningApps, allApps, appIcons, appsLoading } = useApps(mcpLoading);
   const { quickNotes, addNote, clearNotes } = useQuickNotes();
   const { configured: providerConfigured, loading: providerLoading, refresh: refreshProvider } = useProviderStatus();
+  const health = useHealthCheck(!mcpLoading);
   const ramUsage = useRamMonitor();
   const { adjustWindowSizeAndPosition } = useWindowManager(
     containerRef,
@@ -569,6 +571,9 @@ function App() {
               showCommandMenu={showCommandMenu}
               setShowCommandMenu={setShowCommandMenu}
               ramUsage={ramUsage}
+              health={health}
+              onOpenSettings={() => setShowSettings(true)}
+              onOpenProviderSetup={openProviderSetup}
             />
 
             {showCommandMenu && (

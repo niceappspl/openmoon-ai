@@ -1,13 +1,25 @@
 import { X, Settings, Mic } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { HealthBadge } from './HealthBadge';
+import type { HealthCheck } from '../hooks/useHealthCheck';
 
 interface TopBarProps {
   showCommandMenu: boolean;
   setShowCommandMenu: (show: boolean) => void;
   ramUsage: number;
+  health: HealthCheck;
+  onOpenSettings: () => void;
+  onOpenProviderSetup: () => void;
 }
 
-export const TopBar = ({ showCommandMenu, setShowCommandMenu, ramUsage }: TopBarProps) => {
+export const TopBar = ({
+  showCommandMenu,
+  setShowCommandMenu,
+  ramUsage,
+  health,
+  onOpenSettings,
+  onOpenProviderSetup,
+}: TopBarProps) => {
   const handleHide = async () => {
     try {
       await invoke('hide_window');
@@ -45,6 +57,14 @@ export const TopBar = ({ showCommandMenu, setShowCommandMenu, ramUsage }: TopBar
       </div>
 
       <div className="flex items-center gap-2">
+        <HealthBadge
+          health={health.health}
+          checking={health.checking}
+          onRecheck={health.recheck}
+          onOpenSettings={onOpenSettings}
+          onOpenProviderSetup={onOpenProviderSetup}
+        />
+
         {ramUsage > 0 && (
           <div className="flex items-center px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
             <span className="text-[10px] text-white/60 font-medium leading-none">{ramUsage}MB RAM</span>
