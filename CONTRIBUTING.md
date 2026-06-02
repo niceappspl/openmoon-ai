@@ -2,6 +2,14 @@
 
 Thank you for your interest in contributing! openMOON is an open-source project and contributions of all kinds are welcome.
 
+## Before you start (read these)
+
+- **[VISION.md](VISION.md)** — what openMOON is, the three pillars, and the anti-goals. Every change should serve a pillar or bet.
+- **[ROADMAP.md](ROADMAP.md)** — phase plan and what's already done.
+- **[docs/platform-and-prompt-architecture.md](docs/platform-and-prompt-architecture.md)** — the target shape for the agent prompt and cross-platform boundary. Build toward this, not the current debt.
+
+> The fastest way to get a PR merged: pick an issue, comment that you're taking it, and check it against the pillars in VISION.md before writing code.
+
 ## Ways to contribute
 
 - **Bug reports** — open an issue with reproduction steps
@@ -26,6 +34,7 @@ rustup component add rustfmt clippy
    ```bash
    git checkout -b feat/my-feature
    ```
+   (Clone from your fork: `git clone https://github.com/YOUR_USERNAME/openmoon-ai.git`)
 2. Make your changes.
 3. Run the checks locally before opening a PR:
    ```bash

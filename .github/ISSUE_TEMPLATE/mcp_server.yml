@@ -1,0 +1,44 @@
+name: New MCP server / integration
+description: Propose a new MCP server (Slack, Notion, GitHub, …)
+labels: ["enhancement", "mcp-server"]
+body:
+  - type: input
+    id: service
+    attributes:
+      label: Service / integration
+      placeholder: e.g. Slack, Notion, Spotify Web API
+    validations:
+      required: true
+  - type: textarea
+    id: tools
+    attributes:
+      label: Tools to expose
+      description: List the tools and a one-line description each (this becomes the tool `description` the agent routes on).
+      placeholder: |
+        - slack_send_message: send a message to a channel or user
+        - slack_list_channels: list channels the user can access
+    validations:
+      required: true
+  - type: dropdown
+    id: existing
+    attributes:
+      label: Existing MCP server available?
+      description: Prefer reusing an existing community/official MCP server over writing a new one.
+      options:
+        - "Yes — there's an official/community server we can document/config"
+        - "No — needs to be built"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security defaults
+      description: Which tools write/communicate/control state and should default to `ask`? (See CONTRIBUTING — Security.)
+    validations:
+      required: true
+  - type: textarea
+    id: auth
+    attributes:
+      label: Authentication
+      description: How are credentials provided? (Must use `.env` / `${VAR}` placeholders — never hardcoded.)

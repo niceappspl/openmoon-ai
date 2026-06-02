@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a new capability or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: What are you trying to achieve? Describe the user goal, not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: pillar
+    attributes:
+      label: Which pillar / bet does this serve?
+      description: See VISION.md. If it serves none, it may be an anti-goal.
+      options:
+        - "Pillar 1 — Local-first & private"
+        - "Pillar 2 — Open MCP host"
+        - "Pillar 3 — Security model & audit"
+        - "Bet — better onboarding / distribution"
+        - "Bet — cross-platform"
+        - "UX / quality of life"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

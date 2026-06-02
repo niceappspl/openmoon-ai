@@ -11,11 +11,11 @@
 <br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
-[![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black?style=flat-square&logo=apple)](https://github.com/niceappspl/openmoon)
+[![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black?style=flat-square&logo=apple)](https://github.com/niceappspl/openmoon-ai)
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-stable-orange?style=flat-square&logo=rust)](https://rustup.rs)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
-[![CI](https://github.com/niceappspl/openmoon/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/niceappspl/openmoon/actions)
+[![CI](https://github.com/niceappspl/openmoon-ai/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/niceappspl/openmoon-ai/actions)
 
 <br/>
 
@@ -137,8 +137,8 @@ Turn a successful agent run into a reusable workflow with one click ("Save as wo
 ### Install & run
 
 ```bash
-git clone https://github.com/niceappspl/openmoon.git
-cd openmoon
+git clone https://github.com/niceappspl/openmoon-ai.git
+cd openmoon-ai
 npm install
 cp .env.example .env          # add your OPENAI_API_KEY
 npm run tauri:dev
@@ -270,7 +270,7 @@ Restart the app — the server starts automatically and all its tools are instan
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/YOUR_USERNAME/openmoon.git
+git clone https://github.com/YOUR_USERNAME/openmoon-ai.git
 
 # 2. Create a branch
 git checkout -b feat/my-feature

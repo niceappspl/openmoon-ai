@@ -1,7 +1,8 @@
-# openMOON — Vision & Roadmap
+# openMOON — Roadmap
 
-> Direction document: **what** we are building, **why**, **what it will do**, and **in what order**.
-> One goal: make openMOON the local AI agent for macOS that genuinely works on your behalf.
+> Direction document: **what** we are building, **in what order**.
+> The product **why** and the strategic bets live in [VISION.md](VISION.md) — read that first.
+> One goal: make openMOON the local AI agent that genuinely works on your behalf.
 
 ---
 
@@ -94,17 +95,35 @@ Key difference from today: **action chains + context + approval gates for risky 
 - [ ] Publish to Homebrew cask.
 
 ### Phase 5 — Ecosystem & community
+> Architectural prerequisites for this phase are specified in
+> [docs/platform-and-prompt-architecture.md](docs/platform-and-prompt-architecture.md).
+- [ ] **System-prompt refactor** *(unblocks everything below)* — move from a hardcoded ~160-line macOS/EN/PL intent table to behaviour-only prompt + clean tool descriptions, so any MCP server works without prompt edits.
+- [ ] **`PlatformAutomation` boundary** — extract native control behind a trait + platform `automation` MCP server, so cross-platform is an implementation, not a rewrite.
 - [ ] **Plugin/extension API** — allow third-party MCP servers to declare UI extensions (settings page, custom cards).
-- [ ] **Windows and Linux** — investigate Tauri cross-platform compatibility; remove macOS-only deps behind feature flags.
+- [ ] **Windows and Linux** — implement the `PlatformAutomation` boundary for each target; keep `llm.rs` / `security.rs` platform-agnostic.
 - [ ] **Webhook triggers** — HTTP endpoint that fires a saved task.
 - [ ] **System-event triggers** — network change, display connect/disconnect, app launch.
 - [ ] **Voice input** — Whisper integration for hands-free commands.
 - [ ] **Better Ollama compatibility** — model picker, automatic fallback for models without tool calling.
 - [ ] **MCP server marketplace** — curated list of community MCP servers with one-click install.
 
+### Phase 6 — Universal autonomous control *(the North Star)*
+> This is the leap from "launcher that does things" to "an agent you delegate to".
+> See [VISION.md §1a — The North Star](VISION.md) and the capability ladder (rungs 3–6).
+> Depends on the Phase 5 prompt refactor (so new capabilities route without prompt edits).
+- [ ] **Real browser control (rung 3)** — DOM-level automation MCP server (navigate, click, fill, extract, download) via Playwright/CDP, replacing "open URL only".
+- [ ] **Computer use (rung 4)** — screen capture + accessibility tree → click/type at element/coordinate, so *any* app is controllable without a bespoke tool. macOS Accessibility (AX) first, then Windows UI Automation.
+- [ ] **Background task runner (rung 5)** — first-class "task" concept: long-running autonomous jobs with status, progress events, retries, cancellation, and completion notifications. Builds on the existing trigger engine.
+- [ ] **Self-correction & verification (rung 6)** — agent verifies the goal was met (re-read/re-query) and retries or escalates instead of reporting false success (VISION Bet F).
+- [ ] **Capability fallback policy** — enforce preference order: dedicated tool → browser DOM → computer-use (VISION Bet E), with the chosen rung surfaced in the UI/audit log.
+
 ---
 
 ## 6. Risks & open questions
+
+- **Reliability of computer-use** — pixel/AX-driven actions are brittle; mitigate with the tool→DOM→computer-use preference order and mandatory verification (Bet E/F).
+- **Permissions** — universal control needs macOS Accessibility & Screen Recording permissions (and Windows UI Automation); onboarding must request these clearly without scaring users.
+- **Safety surface grows with autonomy** — background, self-directed runs must keep approval gates for risky tools and never disable the audit log.
 
 - Tool calling quality in Ollama depends heavily on the model — need to document recommended models and add a fallback.
 - Agent loop cost: more LLM calls per task → hard step limit + token counter per session.
@@ -120,5 +139,6 @@ openMOON is "ready" when:
 3. It connects **any MCP server** from the ecosystem in seconds.
 4. It **asks for approval** before risky actions and logs everything it does.
 5. It can be installed from GitHub and launched in **< 5 minutes**.
+6. *(North Star)* It can be **delegated a goal** and complete it **autonomously in the background** — driving any app or the browser, verifying the result, and notifying you when done.
 
 > *"openMOON doesn't ask — it understands. It doesn't talk — it acts. It is not an app — it is a presence."*

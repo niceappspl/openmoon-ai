@@ -1,0 +1,56 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including the exact prompt you gave openMOON if relevant.
+      placeholder: I asked "..." and openMOON ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open openMOON (Cmd+Shift+Space)
+        2. Type "..."
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: LLM provider
+      options:
+        - OpenAI
+        - Ollama (local)
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      placeholder: e.g. gpt-4o-mini, llama3.1
+  - type: input
+    id: os
+    attributes:
+      label: OS & version
+      placeholder: e.g. macOS 14.5
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant stderr / console output. Scrub any personal data (prompts, mail, paths).
+      render: shell

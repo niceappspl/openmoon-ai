@@ -136,9 +136,9 @@ Contributions welcome — pick an item, open a PR.
 ### Communication & productivity
 | Service | Status | Issue |
 |---------|--------|-------|
-| **Slack** — send messages, read channels, list channels | Planned | [#1](https://github.com/niceappspl/openmoon/issues/1) |
-| **Notion** — search pages, create/append content | Planned | [#8](https://github.com/niceappspl/openmoon/issues/8) |
-| **GitHub** — list PRs/issues, post comments, read files | Planned | [#5](https://github.com/niceappspl/openmoon/issues/5) |
+| **Slack** — send messages, read channels, list channels | Planned | [#1](https://github.com/niceappspl/openmoon-ai/issues/1) |
+| **Notion** — search pages, create/append content | Planned | [#8](https://github.com/niceappspl/openmoon-ai/issues/8) |
+| **GitHub** — list PRs/issues, post comments, read files | Planned | [#5](https://github.com/niceappspl/openmoon-ai/issues/5) |
 | **Linear** — create/list issues, update status | Planned | — |
 | **Jira** — create/list tickets | Planned | — |
 | **Discord** — send messages, read channels | Planned | — |
@@ -147,7 +147,7 @@ Contributions welcome — pick an item, open a PR.
 ### AI & data
 | Service | Status | Issue |
 |---------|--------|-------|
-| **Anthropic Claude** provider | Planned | [#6](https://github.com/niceappspl/openmoon/issues/6) |
+| **Anthropic Claude** provider | Planned | [#6](https://github.com/niceappspl/openmoon-ai/issues/6) |
 | **Gemini** provider | Planned | — |
 | **Perplexity** — web search with citations | Planned | — |
 | **Wolfram Alpha** — calculations & data | Planned | — |

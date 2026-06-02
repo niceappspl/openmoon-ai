@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Vision & scope
+    url: https://github.com/niceappspl/openmoon-ai/blob/main/VISION.md
+    about: Read this first — what openMOON is, the three pillars, and our anti-goals.
+  - name: Roadmap
+    url: https://github.com/niceappspl/openmoon-ai/blob/main/ROADMAP.md
+    about: Phase plan and what's already done.
+  - name: Security vulnerability (private)
+    url: mailto:jarzebowski.marcin@gmail.com
+    about: Do NOT open a public issue for vulnerabilities — email directly.
