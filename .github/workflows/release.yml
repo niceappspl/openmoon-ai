@@ -79,7 +79,7 @@ jobs:
 
       - name: Staple notarisation ticket to DMG
         run: |
-          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          DMG=$(find target/release/bundle/dmg -name "*.dmg" | head -1)
           echo "Stapling: $DMG"
           xcrun stapler staple "$DMG"
           xcrun stapler validate "$DMG"
@@ -88,7 +88,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          DMG=$(find target/release/bundle/dmg -name "*.dmg" | head -1)
           DMG_NAME=$(basename "$DMG")
 
           NOTES=$(cat <<NOTES
