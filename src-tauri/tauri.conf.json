@@ -1,6 +1,6 @@
 {
   "productName": "openMOON",
-  "version": "1.0.1",
+  "version": "1.0.6",
   "identifier": "com.openmoon.launcher",
   "build": {
     "beforeDevCommand": "npm run dev",
