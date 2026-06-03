@@ -32,6 +32,9 @@ jobs:
     permissions:
       contents: write
 
+    env:
+      TAG: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -85,21 +88,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
           DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
           DMG_NAME=$(basename "$DMG")
 
-          IS_DRAFT=${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
+          NOTES=$(cat <<NOTES
+          ## openMOON ${{ env.TAG }}
 
-          gh release create "$TAG" \
-            --title "openMOON $TAG" \
-            --notes "## openMOON $TAG
+          ### Installation
+          1. Download \`${DMG_NAME}\` below.
+          2. Open the .dmg, drag **openMOON.app** to \`/Applications\`.
+          3. Launch openMOON and set your OpenAI API key in Settings.
 
-### Installation
-1. Download \`$DMG_NAME\` below.
-2. Open the .dmg, drag **openMOON.app** to \`/Applications\`.
-3. Launch openMOON and set your OpenAI API key in Settings.
+          > This build is signed and notarised by Apple — no extra steps needed.
+          NOTES
+          )
 
-> This build is signed and notarised by Apple — no extra steps needed." \
-            $( [ "$IS_DRAFT" = "true" ] && echo "--draft" ) \
-            "$DMG"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            gh release create "${{ env.TAG }}" --draft --title "openMOON ${{ env.TAG }}" --notes "$NOTES" "$DMG"
+          else
+            gh release create "${{ env.TAG }}" --title "openMOON ${{ env.TAG }}" --notes "$NOTES" "$DMG"
+          fi
