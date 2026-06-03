@@ -1,20 +1,16 @@
-# Release workflow — builds, signs/notarises, and publishes a .dmg GitHub Release.
+# Release workflow — builds, signs, notarises, staples, and publishes a .dmg GitHub Release.
 #
 # Triggers automatically on version tags (v*.*.*) and supports manual runs.
 #
-# Optional Apple notarisation secrets (set in repo Settings → Secrets → Actions).
-# Without them the workflow succeeds and produces an unsigned .dmg.
-#
+# Required secrets (repo Settings → Secrets → Actions):
 #   APPLE_CERTIFICATE          — base64-encoded Developer ID Application .p12 cert
 #   APPLE_CERTIFICATE_PASSWORD — .p12 export password
 #   APPLE_SIGNING_IDENTITY     — e.g. "Developer ID Application: Your Name (TEAMID)"
 #   APPLE_ID                   — Apple ID email used for notarisation
 #   APPLE_PASSWORD             — app-specific password for APPLE_ID
 #   APPLE_TEAM_ID              — 10-character Apple Developer Team ID
-#
-# Tauri updater signing (set in repo Settings → Secrets → Actions):
-#   TAURI_SIGNING_PRIVATE_KEY          — base64-encoded private key (generated via: npx @tauri-apps/cli signer generate)
-#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — password used during key generation (openmoon-release-2026)
+#   TAURI_SIGNING_PRIVATE_KEY          — base64-encoded private key
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — password used during key generation
 
 name: Release
 
@@ -25,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag name to release (e.g. v1.0.1). Creates a draft release.'
+        description: 'Tag name to release (e.g. v1.0.2). Creates a draft release.'
         required: false
         default: 'v0.0.0-manual'
 
@@ -65,37 +61,45 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
-      - name: Build, bundle, and publish release
-        uses: tauri-apps/tauri-action@v0
+      - name: Build app (sign + notarise via Tauri)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_INCREMENTAL: "0"
-          # Tauri updater signing — set TAURI_SIGNING_PRIVATE_KEY + PASSWORD secrets to enable
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Apple signing/notarisation — silently skipped when secrets are absent
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        with:
-          tagName: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
-          releaseName: 'openMOON ${{ github.event_name == ''push'' && github.ref_name || github.event.inputs.tag }}'
-          releaseBody: |
-            ## openMOON ${{ github.ref_name }}
+        run: npm run tauri:build
 
-            ### Installation
-            1. Download `openMOON_*.dmg` below.
-            2. Open the .dmg, drag **openMOON.app** to `/Applications`.
-            3. This is an **unsigned** build, so macOS quarantines it. Remove the flag once:
-               ```bash
-               xattr -dr com.apple.quarantine /Applications/openMOON.app
-               ```
-            4. Launch openMOON and set your OpenAI API key in the settings.
+      - name: Staple notarisation ticket to DMG
+        run: |
+          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          echo "Stapling: $DMG"
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
 
-            > **Note:** If you skip step 3 macOS shows "openMOON is damaged and can't be opened" — that's the Gatekeeper quarantine, not a corrupted file.
-          releaseDraft: ${{ github.event_name == 'workflow_dispatch' }}
-          prerelease: false
-          includeUpdaterJson: true
+      - name: Publish GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
+          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          DMG_NAME=$(basename "$DMG")
+
+          IS_DRAFT=${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
+
+          gh release create "$TAG" \
+            --title "openMOON $TAG" \
+            --notes "## openMOON $TAG
+
+### Installation
+1. Download \`$DMG_NAME\` below.
+2. Open the .dmg, drag **openMOON.app** to \`/Applications\`.
+3. Launch openMOON and set your OpenAI API key in Settings.
+
+> This build is signed and notarised by Apple — no extra steps needed." \
+            $( [ "$IS_DRAFT" = "true" ] && echo "--draft" ) \
+            "$DMG"
