@@ -522,6 +522,16 @@ impl OpenAiProvider {
             model,
         }
     }
+
+    pub fn with_base_url(api_key: String, model: String, base_url: &str) -> Self {
+        let config = OpenAIConfig::new()
+            .with_api_key(api_key)
+            .with_api_base(base_url);
+        Self {
+            client: Client::with_config(config),
+            model,
+        }
+    }
 }
 
 fn to_openai_messages(

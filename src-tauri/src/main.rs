@@ -345,7 +345,7 @@ fn extract_volume_level(text: &str) -> Option<String> {
     None
 }
 
-/// Builds the configured LLM provider from settings (OpenAI, Anthropic, or local Ollama).
+/// Builds the configured LLM provider from settings (OpenAI, Anthropic, OpenRouter, or local Ollama).
 fn build_provider(
     app_settings: &settings::AppSettings,
 ) -> Result<Box<dyn llm::LlmProvider>, String> {
@@ -359,11 +359,26 @@ fn build_provider(
                 "No Anthropic API key configured. Add one in Settings → Provider.".to_string()
             })?;
             let model = if app_settings.model.is_empty() {
-                "claude-haiku-3-5".to_string()
+                "claude-sonnet-4-5".to_string()
             } else {
                 app_settings.model.clone()
             };
             Ok(Box::new(llm::AnthropicProvider::new(api_key, model)))
+        }
+        "openrouter" => {
+            let api_key = secrets::get_api_key("openrouter").ok_or_else(|| {
+                "No OpenRouter API key configured. Add one in Settings → Provider.".to_string()
+            })?;
+            let model = if app_settings.model.is_empty() {
+                "openai/gpt-4o-mini".to_string()
+            } else {
+                app_settings.model.clone()
+            };
+            Ok(Box::new(llm::OpenAiProvider::with_base_url(
+                api_key,
+                model,
+                "https://openrouter.ai/api/v1",
+            )))
         }
         _ => {
             let api_key = secrets::get_api_key("openai").ok_or_else(|| {
@@ -909,6 +924,26 @@ async fn probe_provider(
                 401 => Err("Invalid Anthropic API key".to_string()),
                 429 => Err("Anthropic rate limit reached — try again shortly".to_string()),
                 code => Err(format!("Anthropic returned HTTP {}", code)),
+            }
+        }
+        "openrouter" => {
+            let api_key = secrets::get_api_key("openrouter")
+                .ok_or_else(|| "No OpenRouter API key configured. Save a key first.".to_string())?;
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+            let response = client
+                .get("https://openrouter.ai/api/v1/models")
+                .bearer_auth(&api_key)
+                .send()
+                .await
+                .map_err(|e| format!("Network error reaching OpenRouter: {}", e))?;
+            match response.status().as_u16() {
+                200 => Ok("OpenRouter reachable".to_string()),
+                401 => Err("Invalid OpenRouter API key".to_string()),
+                429 => Err("OpenRouter rate limit reached — try again shortly".to_string()),
+                code => Err(format!("OpenRouter returned HTTP {}", code)),
             }
         }
         _ => {

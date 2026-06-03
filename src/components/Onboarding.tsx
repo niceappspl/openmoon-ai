@@ -43,7 +43,31 @@ const STEP_ORDER: StepId[] = ['welcome', 'provider', 'permissions', 'ready'];
 const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   ollama: 'llama3.1',
-  anthropic: 'claude-haiku-3-5',
+  anthropic: 'claude-sonnet-4-5',
+  openrouter: 'openai/gpt-4o-mini',
+};
+
+interface ModelOption { id: string; label: string }
+const PROVIDER_MODELS: Record<string, ModelOption[]> = {
+  openai: [
+    { id: 'gpt-4o-mini',  label: 'GPT-4o mini' },
+    { id: 'gpt-4o',       label: 'GPT-4o' },
+    { id: 'gpt-4.1',      label: 'GPT-4.1' },
+    { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' },
+  ],
+  anthropic: [
+    { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    { id: 'claude-haiku-3-5',  label: 'Claude Haiku 3.5' },
+    { id: 'claude-opus-4-5',   label: 'Claude Opus 4.5' },
+  ],
+  openrouter: [
+    { id: 'openai/gpt-4o-mini',              label: 'GPT-4o mini' },
+    { id: 'openai/gpt-4o',                   label: 'GPT-4o' },
+    { id: 'anthropic/claude-3.5-sonnet',     label: 'Claude Sonnet 3.5' },
+    { id: 'anthropic/claude-3.5-haiku',      label: 'Claude Haiku 3.5' },
+    { id: 'google/gemini-2.0-flash-001',     label: 'Gemini 2.0 Flash' },
+    { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' },
+  ],
 };
 
 const DEFAULT_SECURITY: SecuritySettings = {
@@ -62,13 +86,15 @@ const DEFAULT_SETTINGS: AppSettings = {
 export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
   const [stepIndex, setStepIndex] = useState(0);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [provider, setProvider] = useState<'openai' | 'ollama' | 'anthropic'>('openai');
+  const [provider, setProvider] = useState<'openai' | 'ollama' | 'anthropic' | 'openrouter'>('openai');
   const [model, setModel] = useState(DEFAULT_MODELS.openai);
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState(DEFAULT_SETTINGS.ollamaBaseUrl);
   const [openaiKeyInput, setOpenaiKeyInput] = useState('');
   const [openaiKeySet, setOpenaiKeySet] = useState(false);
   const [anthropicKeyInput, setAnthropicKeyInput] = useState('');
   const [anthropicKeySet, setAnthropicKeySet] = useState(false);
+  const [openrouterKeyInput, setOpenrouterKeyInput] = useState('');
+  const [openrouterKeySet, setOpenrouterKeySet] = useState(false);
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
   const [ollamaChecking, setOllamaChecking] = useState(false);
   const [validating, setValidating] = useState(false);
@@ -82,7 +108,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
       .then((loaded) => {
         const merged = { ...DEFAULT_SETTINGS, ...loaded, security: { ...DEFAULT_SECURITY, ...loaded.security } };
         setSettings(merged);
-        setProvider(merged.provider === 'ollama' ? 'ollama' : merged.provider === 'anthropic' ? 'anthropic' : 'openai');
+        setProvider(merged.provider === 'ollama' ? 'ollama' : merged.provider === 'anthropic' ? 'anthropic' : merged.provider === 'openrouter' ? 'openrouter' : 'openai');
         setModel(merged.model);
         setOllamaBaseUrl(merged.ollamaBaseUrl);
       })
@@ -109,7 +135,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
     }
   }, [currentStep, provider, ollamaBaseUrl, checkOllama]);
 
-  const handleSelectProvider = (next: 'openai' | 'ollama' | 'anthropic') => {
+  const handleSelectProvider = (next: 'openai' | 'ollama' | 'anthropic' | 'openrouter') => {
     setError(null);
     setProvider(next);
     setModel(DEFAULT_MODELS[next] ?? '');
@@ -152,6 +178,21 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
         }
       } else if (!anthropicKeySet) {
         setError('Paste your Anthropic API key to continue.');
+        return;
+      }
+    } else if (provider === 'openrouter') {
+      const key = openrouterKeyInput.trim();
+      if (key) {
+        try {
+          await invoke('set_api_key', { provider: 'openrouter', key });
+          setOpenrouterKeyInput('');
+          setOpenrouterKeySet(true);
+        } catch (e) {
+          setError(String(e));
+          return;
+        }
+      } else if (!openrouterKeySet) {
+        setError('Paste your OpenRouter API key to continue.');
         return;
       }
     } else if (!model.trim()) {
@@ -198,21 +239,49 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
               <h2 className="text-base font-medium text-white/90">Choose a provider</h2>
             </div>
 
-            <div className="flex gap-2">
-              {(['openai', 'anthropic', 'ollama'] as const).map((p) => (
+            <div className="flex gap-2 flex-wrap">
+              {(['openai', 'anthropic', 'openrouter', 'ollama'] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => handleSelectProvider(p)}
-                  className={`flex-1 px-3 py-2 rounded text-xs transition-colors border ${
+                  className={`px-3 py-2 rounded text-xs transition-colors border ${
                     provider === p
                       ? 'bg-white/10 text-white border-blue-500/50'
                       : 'text-white/60 hover:text-white/80 hover:bg-white/5 border-white/10'
                   }`}
                 >
-                  {p === 'openai' ? 'OpenAI' : p === 'anthropic' ? 'Anthropic' : 'Ollama (local)'}
+                  {p === 'openai' ? 'OpenAI' : p === 'anthropic' ? 'Anthropic' : p === 'openrouter' ? 'OpenRouter' : 'Ollama (local)'}
                 </button>
               ))}
             </div>
+
+            {PROVIDER_MODELS[provider] && (
+              <div>
+                <label className="text-xs font-medium text-white/80 mb-2 block">Model</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {PROVIDER_MODELS[provider].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setModel(opt.id)}
+                      className={`px-2 py-1 rounded text-[10px] border transition-colors ${
+                        model === opt.id
+                          ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                          : 'bg-white/5 text-white/50 border-white/10 hover:text-white/70 hover:bg-white/8'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder={DEFAULT_MODELS[provider] ?? ''}
+                  className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+            )}
 
             {provider === 'openai' && (
               <div>
@@ -262,6 +331,32 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
                 />
                 <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
                   Stored securely in your macOS keychain — never written to settings.
+                </p>
+              </div>
+            )}
+
+            {provider === 'openrouter' && (
+              <div>
+                <label className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                  <Key className="h-3 w-3" />
+                  OpenRouter API Key
+                </label>
+                {openrouterKeySet && (
+                  <div className="flex items-center gap-2 mb-2 text-[11px] text-green-400">
+                    <CheckCircle className="h-3 w-3" />
+                    API key already configured
+                  </div>
+                )}
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={openrouterKeyInput}
+                  onChange={(e) => setOpenrouterKeyInput(e.target.value)}
+                  placeholder={openrouterKeySet ? 'Enter a new key to replace…' : 'sk-or-…'}
+                  className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+                />
+                <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
+                  Get your key at <span className="text-white/60">openrouter.ai/keys</span>. Stored securely in your keychain.
                 </p>
               </div>
             )}
