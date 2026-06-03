@@ -1,5 +1,5 @@
 import { RefObject } from 'react';
-import { Play } from 'lucide-react';
+import { Play, Loader2 } from 'lucide-react';
 
 interface InputFieldProps {
   value: string;
@@ -24,6 +24,8 @@ export const InputField = ({
   textareaRef,
   isLoading
 }: InputFieldProps) => {
+  const hasText = value.trim().length > 0;
+
   return (
     <>
       <div className="mt-3">
@@ -33,37 +35,39 @@ export const InputField = ({
           onChange={onChange}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
-          className={`w-full bg-transparent border-none text-white focus:outline-none text-[15px] font-normal resize-none overflow-y-auto disabled:opacity-50 transition-all duration-200 ${placeholderFading ? 'placeholder-white/10' : 'placeholder-white/40'}`}
+          className={`w-full bg-transparent border-none text-white/95 focus:outline-none text-[16px] font-light tracking-[-0.015em] leading-relaxed resize-none overflow-y-auto disabled:opacity-40 transition-opacity duration-200 caret-orange-400 ${
+            placeholderFading ? 'placeholder-white/10' : 'placeholder-white/25'
+          }`}
           disabled={disabled}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck="false"
           rows={1}
-          style={{ minHeight: '28px', maxHeight: '84px' }}
+          style={{ minHeight: '28px', maxHeight: '96px' }}
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
-        <div className="text-[10px] text-white/30">
-          {value.trim() && (
-            <span>
-              ⌘↵ to execute
-            </span>
-          )}
-        </div>
+      <div className="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2">
+        <span className={`text-[10px] tracking-widest transition-opacity duration-150 ${hasText ? 'text-white/20 opacity-100' : 'opacity-0'}`}>
+          ⌘ ↵
+        </span>
+
         <button
           type="button"
           onClick={onSubmit}
-          disabled={!value.trim() || isLoading}
-          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-medium border transition-all active:scale-[0.98] border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 ${
-            !value.trim() || isLoading ? 'opacity-30 cursor-not-allowed' : ''
+          disabled={!hasText || isLoading}
+          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-medium border transition-all duration-200 active:scale-[0.97] ${
+            hasText && !isLoading
+              ? 'border-orange-500/40 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 hover:border-orange-500/60'
+              : 'border-white/8 bg-transparent text-white/25 cursor-not-allowed'
           }`}
         >
-          <Play className={`h-2.5 w-2.5 text-white/70 ${isLoading ? 'animate-pulse' : ''}`} />
-          <span className="text-white/70">
-            {isLoading ? 'Running...' : 'Run'}
-          </span>
+          {isLoading
+            ? <Loader2 className="h-2.5 w-2.5 animate-spin text-orange-400" />
+            : <Play className={`h-2.5 w-2.5 ${hasText ? 'text-orange-400' : 'text-white/25'}`} />
+          }
+          <span>{isLoading ? 'Running…' : 'Run'}</span>
         </button>
       </div>
     </>

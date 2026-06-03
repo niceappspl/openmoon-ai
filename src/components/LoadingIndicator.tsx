@@ -50,43 +50,37 @@ export const LoadingIndicator = () => {
 };
 
 export const McpLoadingIndicator = () => {
-  const [loadingStep, setLoadingStep] = useState(0);
   const steps = [
     "Starting MCP servers...",
     "Initializing automation tools...",
     "Loading application database...",
     "Preparing AI assistant...",
-    "Almost ready..."
+    "Almost ready...",
   ];
+  const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setLoadingStep(prev => (prev + 1) % steps.length);
-    }, 2000);
-
+      setStepIndex(prev => (prev < steps.length - 1 ? prev + 1 : prev));
+    }, 1500);
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="flex flex-col items-center justify-center py-6 animate-in fade-in duration-300">
       <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-blue-500/20 rounded-xl blur-lg animate-pulse"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-blue-500/20 rounded-xl blur-lg animate-pulse" />
         <img
           src="/icon.png"
           alt="openMOON"
           className="relative w-12 h-12 rounded-xl"
-          style={{
-            animation: 'gentleRotate 4s ease-in-out infinite'
-          }}
+          style={{ animation: 'gentleRotate 4s ease-in-out infinite' }}
         />
       </div>
-      <p className="mt-3 text-xs text-white/60 animate-pulse">{steps[loadingStep]}</p>
-      <div className="mt-2 w-32 h-1 bg-white/10 rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-gradient-to-r from-orange-500 to-blue-500 rounded-full transition-all duration-1000"
-          style={{
-            width: `${((loadingStep + 1) / steps.length) * 100}%`
-          }}
+      <p className="mt-3 text-xs text-white/60">{steps[stepIndex]}</p>
+      <div className="mt-2 w-32 h-0.5 bg-white/10 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-orange-500 to-blue-500 rounded-full animate-[indeterminate_1.6s_ease-in-out_infinite]"
         />
       </div>
     </div>
