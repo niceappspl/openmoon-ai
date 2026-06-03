@@ -1023,8 +1023,7 @@ async fn save_system_prompt(app: tauri::AppHandle, prompt: String) -> Result<(),
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    fs::create_dir_all(&app_dir)
-        .map_err(|e| format!("Failed to create app data dir: {}", e))?;
+    fs::create_dir_all(&app_dir).map_err(|e| format!("Failed to create app data dir: {}", e))?;
     let path = app_dir.join("system_prompt.md");
     if prompt.trim().is_empty() {
         let _ = fs::remove_file(&path);

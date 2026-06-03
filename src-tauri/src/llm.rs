@@ -848,9 +848,7 @@ impl AnthropicProvider {
 /// message separately (Anthropic takes it as a top-level field) and batching
 /// consecutive `Tool` results into a single user message with `tool_result`
 /// content blocks (as required by the Anthropic Messages API).
-fn to_anthropic_messages(
-    messages: &[ProviderMessage],
-) -> (Option<String>, Vec<serde_json::Value>) {
+fn to_anthropic_messages(messages: &[ProviderMessage]) -> (Option<String>, Vec<serde_json::Value>) {
     let mut system_content: Option<String> = None;
     let mut out: Vec<serde_json::Value> = Vec::new();
 
@@ -998,7 +996,11 @@ impl LlmProvider for AnthropicProvider {
                     let id = block["id"].as_str().unwrap_or("").to_string();
                     let name = block["name"].as_str().unwrap_or("").to_string();
                     let arguments = block["input"].to_string();
-                    tool_calls.push(ToolCall { id, name, arguments });
+                    tool_calls.push(ToolCall {
+                        id,
+                        name,
+                        arguments,
+                    });
                 }
                 _ => {}
             }
