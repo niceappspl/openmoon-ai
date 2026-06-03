@@ -89,9 +89,13 @@ jobs:
             ### Installation
             1. Download `openMOON_*.dmg` below.
             2. Open the .dmg, drag **openMOON.app** to `/Applications`.
-            3. Set your OpenAI API key in the app settings.
+            3. This is an **unsigned** build, so macOS quarantines it. Remove the flag once:
+               ```bash
+               xattr -dr com.apple.quarantine /Applications/openMOON.app
+               ```
+            4. Launch openMOON and set your OpenAI API key in the settings.
 
-            > **Note:** If macOS shows "unidentified developer", right-click → Open the first time (unsigned build).
+            > **Note:** If you skip step 3 macOS shows "openMOON is damaged and can't be opened" — that's the Gatekeeper quarantine, not a corrupted file.
           releaseDraft: ${{ github.event_name == 'workflow_dispatch' }}
           prerelease: false
           includeUpdaterJson: true
