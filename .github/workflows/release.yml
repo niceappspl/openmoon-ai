@@ -77,13 +77,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run tauri:build
 
-      - name: Staple notarisation ticket to DMG
-        run: |
-          DMG=$(find target/release/bundle/dmg -name "*.dmg" | head -1)
-          echo "Stapling: $DMG"
-          xcrun stapler staple "$DMG"
-          xcrun stapler validate "$DMG"
-
       - name: Publish GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
