@@ -6,19 +6,19 @@ import type { HealthCheck } from '../hooks/useHealthCheck';
 interface TopBarProps {
   showCommandMenu: boolean;
   setShowCommandMenu: (show: boolean) => void;
-  ramUsage: number;
   health: HealthCheck;
   onOpenSettings: () => void;
   onOpenProviderSetup: () => void;
+  onHealthExpanded?: (expanded: boolean) => void;
 }
 
 export const TopBar = ({
   showCommandMenu,
   setShowCommandMenu,
-  ramUsage,
   health,
   onOpenSettings,
   onOpenProviderSetup,
+  onHealthExpanded,
 }: TopBarProps) => {
   const handleHide = async () => {
     try {
@@ -63,13 +63,8 @@ export const TopBar = ({
           onRecheck={health.recheck}
           onOpenSettings={onOpenSettings}
           onOpenProviderSetup={onOpenProviderSetup}
+          onExpandedChange={onHealthExpanded}
         />
-
-        {ramUsage > 0 && (
-          <div className="flex items-center px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
-            <span className="text-[10px] text-white/60 font-medium leading-none">{ramUsage}MB RAM</span>
-          </div>
-        )}
 
         <button
           type="button"

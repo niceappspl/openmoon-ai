@@ -40,6 +40,9 @@ export const useProviderStatus = (): ProviderStatus => {
       if (settings.provider === 'ollama') {
         const status = await invoke<OllamaStatus>('ollama_status', { baseUrl: settings.ollamaBaseUrl });
         setConfigured(status.running);
+      } else if (settings.provider === 'anthropic' || settings.provider === 'openrouter') {
+        const hasKey = await invoke<boolean>('has_api_key_cmd', { provider: settings.provider });
+        setConfigured(hasKey);
       } else {
         const hasKey = await invoke<boolean>('has_api_key_cmd', { provider: 'openai' });
         setConfigured(hasKey);

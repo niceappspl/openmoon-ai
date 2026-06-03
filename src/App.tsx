@@ -7,7 +7,6 @@ import { classifyError, isBudgetResponse, type ClassifiedError } from './utils/e
 import { useMcp } from './hooks/useMcp';
 import { useApps } from './hooks/useApps';
 import { useQuickNotes } from './hooks/useQuickNotes';
-import { useRamMonitor } from './hooks/useRamMonitor';
 import { useWindowManager } from './hooks/useWindowManager';
 import { useProviderStatus } from './hooks/useProviderStatus';
 import { useHealthCheck } from './hooks/useHealthCheck';
@@ -59,6 +58,7 @@ function App() {
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
   const [recordedSteps, setRecordedSteps] = useState<RecordedStep[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [healthBadgeExpanded, setHealthBadgeExpanded] = useState(false);
   const [agentError, setAgentError] = useState<ClassifiedError | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -71,14 +71,13 @@ function App() {
   const { quickNotes, addNote, clearNotes } = useQuickNotes();
   const { configured: providerConfigured, loading: providerLoading, refresh: refreshProvider } = useProviderStatus();
   const health = useHealthCheck(!mcpLoading);
-  const ramUsage = useRamMonitor();
   const { tokens, costUsd } = useTokenCount(`${input}${response ? `\n${response}` : ''}`);
   const { placeholder: rotatingPlaceholder, isFading: placeholderFading } = useRotatingPlaceholder(
     !!input.trim() || isLoading
   );
   const { adjustWindowSizeAndPosition } = useWindowManager(
     containerRef,
-    [response, showSuggestions, showCommandMenu, input, filteredSuggestions.length, showTestCommands, showSettings, agentSteps.length, approval, recordedSteps.length, showOnboarding, providerConfigured, agentError],
+    [response, showSuggestions, showCommandMenu, input, filteredSuggestions.length, showTestCommands, showSettings, agentSteps.length, approval, recordedSteps.length, showOnboarding, providerConfigured, agentError, healthBadgeExpanded],
     showWorkflows
   );
 
@@ -605,11 +604,12 @@ function App() {
             <TopBar
               showCommandMenu={showCommandMenu}
               setShowCommandMenu={setShowCommandMenu}
-              ramUsage={ramUsage}
               health={health}
               onOpenSettings={() => setShowSettings(true)}
               onOpenProviderSetup={openProviderSetup}
+              onHealthExpanded={setHealthBadgeExpanded}
             />
+            {healthBadgeExpanded && <div className="h-36" aria-hidden />}
 
             {showCommandMenu && (
               <CommandMenu

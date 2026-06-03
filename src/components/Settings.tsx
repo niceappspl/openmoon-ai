@@ -63,7 +63,34 @@ interface OllamaStatus {
 const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   ollama: 'llama3.1',
-  anthropic: 'claude-haiku-3-5',
+  anthropic: 'claude-sonnet-4-5',
+  openrouter: 'openai/gpt-4o-mini',
+};
+
+interface ModelOption { id: string; label: string }
+const PROVIDER_MODELS: Record<string, ModelOption[]> = {
+  openai: [
+    { id: 'gpt-4o-mini',  label: 'GPT-4o mini' },
+    { id: 'gpt-4o',       label: 'GPT-4o' },
+    { id: 'gpt-4.1',      label: 'GPT-4.1' },
+    { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' },
+    { id: 'gpt-4.1-nano', label: 'GPT-4.1 nano' },
+    { id: 'o3-mini',      label: 'o3-mini' },
+  ],
+  anthropic: [
+    { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    { id: 'claude-haiku-3-5',  label: 'Claude Haiku 3.5' },
+    { id: 'claude-opus-4-5',   label: 'Claude Opus 4.5' },
+  ],
+  openrouter: [
+    { id: 'openai/gpt-4o-mini',                          label: 'GPT-4o mini' },
+    { id: 'openai/gpt-4o',                               label: 'GPT-4o' },
+    { id: 'anthropic/claude-3.5-sonnet',                 label: 'Claude Sonnet 3.5' },
+    { id: 'anthropic/claude-3.5-haiku',                  label: 'Claude Haiku 3.5' },
+    { id: 'google/gemini-2.0-flash-001',                 label: 'Gemini 2.0 Flash' },
+    { id: 'meta-llama/llama-3.3-70b-instruct',           label: 'Llama 3.3 70B' },
+    { id: 'mistralai/mistral-small-3.1-24b-instruct',    label: 'Mistral Small 3.1' },
+  ],
 };
 
 const DEFAULT_SECURITY: SecuritySettings = {
@@ -257,6 +284,8 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
   const [openaiKeySet, setOpenaiKeySet] = useState(false);
   const [anthropicKeyInput, setAnthropicKeyInput] = useState('');
   const [anthropicKeySet, setAnthropicKeySet] = useState(false);
+  const [openrouterKeyInput, setOpenrouterKeyInput] = useState('');
+  const [openrouterKeySet, setOpenrouterKeySet] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState('');
   const [systemPromptInput, setSystemPromptInput] = useState('');
   const [savingSystemPrompt, setSavingSystemPrompt] = useState(false);
@@ -293,6 +322,9 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
     invoke<boolean>('has_api_key_cmd', { provider: 'anthropic' })
       .then(setAnthropicKeySet)
       .catch(() => setAnthropicKeySet(false));
+    invoke<boolean>('has_api_key_cmd', { provider: 'openrouter' })
+      .then(setOpenrouterKeySet)
+      .catch(() => setOpenrouterKeySet(false));
   };
 
   useEffect(() => {
@@ -427,6 +459,30 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
       .catch(() => {});
   };
 
+  const handleSaveOpenrouterKey = () => {
+    const key = openrouterKeyInput.trim();
+    if (!key) return;
+    setSavingKey(true);
+    setSaveKeySuccess(false);
+    setTestResult(null);
+    invoke('set_api_key', { provider: 'openrouter', key })
+      .then(() => {
+        setOpenrouterKeyInput('');
+        refreshKeyStatus();
+        setSaveKeySuccess(true);
+        setTimeout(() => setSaveKeySuccess(false), 2500);
+      })
+      .catch(() => {})
+      .finally(() => setSavingKey(false));
+  };
+
+  const handleClearOpenrouterKey = () => {
+    setTestResult(null);
+    invoke('remove_api_key', { provider: 'openrouter' })
+      .then(refreshKeyStatus)
+      .catch(() => {});
+  };
+
   const handleSaveSystemPrompt = () => {
     setSavingSystemPrompt(true);
     setSystemPromptSaved(false);
@@ -517,111 +573,96 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
     }
   };
 
+  const TABS = [
+    { id: 'permissions', label: 'Permissions', icon: Shield },
+    { id: 'general', label: 'General', icon: SettingsIcon },
+    { id: 'security', label: 'Security', icon: ShieldAlert },
+    { id: 'triggers', label: 'Triggers', icon: Clock },
+    { id: 'audit', label: 'Audit', icon: ScrollText },
+    { id: 'history', label: 'History', icon: HistoryIcon },
+  ] as const;
+
   return (
-    <div className="mt-2 rounded-lg bg-black/95 border border-white/10 backdrop-blur-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col h-[500px]">
+    <div
+      className="relative mt-2 rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col h-[520px] border border-white/10"
+      style={{
+        background: 'linear-gradient(180deg, rgba(22,22,26,0.92) 0%, rgba(10,10,12,0.96) 100%)',
+        boxShadow: '0 24px 70px -24px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.06)',
+        backdropFilter: 'blur(48px)',
+        WebkitBackdropFilter: 'blur(48px)',
+      }}
+    >
+      {/* Ambient brand glows */}
+      <div
+        className="pointer-events-none absolute -top-28 -left-24 h-64 w-64 rounded-full blur-3xl opacity-30"
+        style={{ background: 'radial-gradient(circle, #FF8918 0%, transparent 70%)' }}
+      />
+      <div
+        className="pointer-events-none absolute -bottom-28 -right-24 h-64 w-64 rounded-full blur-3xl opacity-25"
+        style={{ background: 'radial-gradient(circle, #0098f3 0%, transparent 70%)' }}
+      />
+
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <Shield className="h-4 w-4 text-blue-400/70" />
-          <h3 className="text-sm font-medium text-white/90">Settings</h3>
+      <div className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-xl border border-white/10"
+            style={{ background: 'linear-gradient(135deg, rgba(255,137,24,0.25), rgba(0,152,243,0.18))' }}
+          >
+            <Shield className="h-3.5 w-3.5 text-white/90" />
+          </div>
+          <h3 className="text-sm font-semibold tracking-tight text-white">Settings</h3>
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded hover:bg-white/5 transition-colors"
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 transition"
           title="Close (ESC)"
         >
-          <X className="h-4 w-4 text-white/50" />
+          <X className="h-3.5 w-3.5 text-white/60" />
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/10">
-        <button
-          onClick={() => setActiveTab('permissions')}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
-            activeTab === 'permissions'
-              ? 'text-white border-b-2 border-blue-500 bg-white/5'
-              : 'text-white/60 hover:text-white/80'
-          }`}
-        >
-          <Shield className="h-3 w-3" />
-          Permissions
-        </button>
-        <button
-          onClick={() => setActiveTab('general')}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
-            activeTab === 'general'
-              ? 'text-white border-b-2 border-blue-500 bg-white/5'
-              : 'text-white/60 hover:text-white/80'
-          }`}
-        >
-          <SettingsIcon className="h-3 w-3" />
-          General
-        </button>
-        <button
-          onClick={() => setActiveTab('security')}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
-            activeTab === 'security'
-              ? 'text-white border-b-2 border-blue-500 bg-white/5'
-              : 'text-white/60 hover:text-white/80'
-          }`}
-        >
-          <ShieldAlert className="h-3 w-3" />
-          Security
-        </button>
-        <button
-          onClick={() => setActiveTab('triggers')}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
-            activeTab === 'triggers'
-              ? 'text-white border-b-2 border-blue-500 bg-white/5'
-              : 'text-white/60 hover:text-white/80'
-          }`}
-        >
-          <Clock className="h-3 w-3" />
-          Triggers
-        </button>
-        <button
-          onClick={() => setActiveTab('audit')}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
-            activeTab === 'audit'
-              ? 'text-white border-b-2 border-blue-500 bg-white/5'
-              : 'text-white/60 hover:text-white/80'
-          }`}
-        >
-          <ScrollText className="h-3 w-3" />
-          Audit
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
-            activeTab === 'history'
-              ? 'text-white border-b-2 border-blue-500 bg-white/5'
-              : 'text-white/60 hover:text-white/80'
-          }`}
-        >
-          <HistoryIcon className="h-3 w-3" />
-          History
-        </button>
+      <div className="relative z-10 px-3 pt-3">
+        <div className="flex gap-1 rounded-xl border border-white/[0.08] bg-white/[0.03] p-1">
+          {TABS.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all ${
+                  active
+                    ? 'bg-white/[0.10] text-white border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]'
+                    : 'text-white/50 hover:text-white/90 hover:bg-white/[0.05] border border-transparent'
+                }`}
+              >
+                <tab.icon className="h-3 w-3" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="relative z-10 flex-1 overflow-hidden flex flex-col">
         {activeTab === 'permissions' && (
           <div className="flex-1 flex overflow-hidden">
             {/* Categories Sidebar */}
-            <div className="w-36 border-r border-white/10 p-2 flex flex-col">
-              <h3 className="text-xs font-medium text-white/80 mb-2">Categories</h3>
+            <div className="w-40 border-r border-white/[0.08] p-3 flex flex-col">
+              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-white/40 mb-2 px-1">Categories</h3>
               <div className="flex-1 overflow-y-auto space-y-1">
                 <button
                   onClick={() => setSelectedCategory(null)}
-                  className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center gap-1 ${
+                  className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition-all flex items-center gap-2 ${
                     selectedCategory === null
-                      ? 'bg-white/10 text-white'
-                      : 'text-white/60 hover:text-white/80 hover:bg-white/5'
+                      ? 'bg-white/[0.08] text-white border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
+                      : 'text-white/55 hover:text-white/90 hover:bg-white/[0.05] border border-transparent'
                   }`}
                 >
-                  <span className="text-[10px]">All</span>
-                  <span className="text-[10px] text-white/40">({PERMISSIONS.length})</span>
+                  <span className="flex-1 text-[11px]">All</span>
+                  <span className="text-[10px] text-white/35">{PERMISSIONS.length}</span>
                 </button>
                 {Object.entries(CATEGORIES).map(([key, category]) => {
                   const count = PERMISSIONS.filter(p => p.category === key).length;
@@ -629,15 +670,15 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                     <button
                       key={key}
                       onClick={() => setSelectedCategory(key)}
-                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center gap-1 ${
+                      className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition-all flex items-center gap-2 ${
                         selectedCategory === key
-                          ? 'bg-white/10 text-white'
-                          : 'text-white/60 hover:text-white/80 hover:bg-white/5'
+                          ? 'bg-white/[0.08] text-white border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
+                          : 'text-white/55 hover:text-white/90 hover:bg-white/[0.05] border border-transparent'
                       }`}
                     >
-                      <category.icon className="h-3 w-3 flex-shrink-0" />
-                      <span className="text-[10px] truncate">{category.name}</span>
-                      <span className="text-[10px] text-white/40">({count})</span>
+                      <category.icon className="h-3.5 w-3.5 flex-shrink-0 opacity-80" />
+                      <span className="flex-1 text-[11px] truncate">{category.name}</span>
+                      <span className="text-[10px] text-white/35">{count}</span>
                     </button>
                   );
                 })}
@@ -645,45 +686,55 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
             </div>
 
             {/* Permissions List */}
-            <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex-1 overflow-y-auto p-3.5">
               <div className="space-y-2">
                 {filteredPermissions.map((permission) => (
                   <div
                     key={permission.id}
-                    className={`border rounded-lg px-3 py-2.5 transition-colors ${
-                      permission.status === 'granted'
-                        ? 'bg-white/3 border-white/8'
-                        : permission.status === 'denied'
-                        ? 'bg-red-500/5 border-red-500/20'
-                        : 'bg-white/5 border-white/10'
+                    className={`group rounded-xl px-3.5 py-3 border transition-all hover:bg-white/[0.04] ${
+                      permission.status === 'denied'
+                        ? 'bg-red-500/[0.06] border-red-500/20'
+                        : 'bg-white/[0.025] border-white/[0.08]'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`p-1.5 rounded-md flex-shrink-0 ${
-                        permission.status === 'granted' ? 'bg-green-500/10' : 'bg-white/5'
-                      }`}>
-                        <permission.icon className={`h-3.5 w-3.5 ${
-                          permission.status === 'granted' ? 'text-green-400' : 'text-white/50'
+                      <div
+                        className="flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0 border border-white/10"
+                        style={{
+                          background:
+                            permission.status === 'granted'
+                              ? 'linear-gradient(135deg, rgba(34,197,94,0.22), rgba(34,197,94,0.06))'
+                              : permission.status === 'denied'
+                              ? 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(239,68,68,0.06))'
+                              : 'linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02))',
+                        }}
+                      >
+                        <permission.icon className={`h-4 w-4 ${
+                          permission.status === 'granted'
+                            ? 'text-green-400'
+                            : permission.status === 'denied'
+                            ? 'text-red-400'
+                            : 'text-white/60'
                         }`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-medium text-white/90 truncate">{permission.name}</span>
+                          <span className="text-[13px] font-medium text-white/95 truncate">{permission.name}</span>
                           {permission.required && (
-                            <span className="px-1 py-0.5 bg-white/8 text-white/40 text-[9px] rounded uppercase tracking-wide flex-shrink-0">
+                            <span className="px-1.5 py-0.5 bg-white/[0.08] text-white/45 text-[9px] rounded-md uppercase tracking-wider flex-shrink-0">
                               req
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-white/40 truncate">{permission.description}</p>
+                        <p className="text-[11px] text-white/40 truncate mt-0.5">{permission.description}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border ${
                           permission.status === 'granted'
-                            ? 'bg-green-500/15 text-green-400'
+                            ? 'bg-green-500/10 text-green-400 border-green-500/20'
                             : permission.status === 'denied'
-                            ? 'bg-red-500/15 text-red-400'
-                            : 'bg-yellow-500/15 text-yellow-400'
+                            ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                            : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                         }`}>
                           {permission.status === 'granted'
                             ? <CheckCircle className="h-3 w-3" />
@@ -696,7 +747,7 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                         {permission.status !== 'granted' && permission.settingsKind && (
                           <button
                             onClick={() => invoke('open_permission_settings', { kind: permission.settingsKind })}
-                            className="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-[10px] font-medium rounded border border-blue-500/20 transition-colors whitespace-nowrap"
+                            className="px-2.5 py-1.5 bg-white/[0.06] hover:bg-white/[0.12] text-white/80 text-[10px] font-medium rounded-lg border border-white/10 transition-all whitespace-nowrap active:scale-95"
                           >
                             Open Settings
                           </button>
@@ -708,29 +759,32 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
               </div>
 
               {/* Summary */}
-              <div className="mt-6 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                <h3 className="text-xs font-medium text-blue-400 mb-3 flex items-center gap-2">
+              <div
+                className="mt-5 rounded-xl p-4 border border-white/[0.08]"
+                style={{ background: 'linear-gradient(135deg, rgba(255,137,24,0.06), rgba(0,152,243,0.06))' }}
+              >
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-white/55 mb-3 flex items-center gap-2">
                   <Shield className="h-3 w-3" />
                   Permission Summary
                 </h3>
-                <div className="grid grid-cols-3 gap-3 text-[10px]">
-                  <div className="text-center p-2 bg-green-500/10 rounded border border-green-500/20">
-                    <div className="text-green-400 font-medium text-sm">
+                <div className="grid grid-cols-3 gap-2.5 text-[10px]">
+                  <div className="text-center py-2.5 bg-green-500/[0.08] rounded-lg border border-green-500/20">
+                    <div className="text-green-400 font-semibold text-lg leading-none">
                       {PERMISSIONS.filter(p => p.status === 'granted').length}
                     </div>
-                    <div className="text-white/60">Granted</div>
+                    <div className="text-white/50 mt-1">Granted</div>
                   </div>
-                  <div className="text-center p-2 bg-red-500/10 rounded border border-red-500/20">
-                    <div className="text-red-400 font-medium text-sm">
+                  <div className="text-center py-2.5 bg-red-500/[0.08] rounded-lg border border-red-500/20">
+                    <div className="text-red-400 font-semibold text-lg leading-none">
                       {PERMISSIONS.filter(p => p.status === 'denied').length}
                     </div>
-                    <div className="text-white/60">Denied</div>
+                    <div className="text-white/50 mt-1">Denied</div>
                   </div>
-                  <div className="text-center p-2 bg-yellow-500/10 rounded border border-yellow-500/20">
-                    <div className="text-yellow-400 font-medium text-sm">
+                  <div className="text-center py-2.5 bg-yellow-500/[0.08] rounded-lg border border-yellow-500/20">
+                    <div className="text-yellow-400 font-semibold text-lg leading-none">
                       {PERMISSIONS.filter(p => p.status === 'unknown').length}
                     </div>
-                    <div className="text-white/60">Unknown</div>
+                    <div className="text-white/50 mt-1">Unknown</div>
                   </div>
                 </div>
               </div>
@@ -745,18 +799,18 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                 <Bot className="h-3 w-3" />
                 AI Provider
               </h3>
-              <div className="flex gap-2">
-                {(['openai', 'anthropic', 'ollama'] as const).map((provider) => (
+              <div className="flex gap-2 flex-wrap">
+                {(['openai', 'anthropic', 'openrouter', 'ollama'] as const).map((provider) => (
                   <button
                     key={provider}
                     onClick={() => handleProviderChange(provider)}
-                    className={`flex-1 px-3 py-2 rounded text-xs transition-colors border ${
+                    className={`px-3 py-2 rounded text-xs transition-colors border ${
                       settings.provider === provider
                         ? 'bg-white/10 text-white border-blue-500/50'
                         : 'text-white/60 hover:text-white/80 hover:bg-white/5 border-white/10'
                     }`}
                   >
-                    {provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'Ollama (local)'}
+                    {provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : provider === 'openrouter' ? 'OpenRouter' : 'Ollama (local)'}
                   </button>
                 ))}
               </div>
@@ -788,6 +842,23 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
 
             <div>
               <label className="text-xs font-medium text-white/80 mb-2 block">Model</label>
+              {PROVIDER_MODELS[settings.provider] && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {PROVIDER_MODELS[settings.provider].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => persistSettings({ ...settings, model: opt.id })}
+                      className={`px-2 py-1 rounded text-[10px] border transition-colors ${
+                        settings.model === opt.id
+                          ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                          : 'bg-white/5 text-white/50 border-white/10 hover:text-white/70 hover:bg-white/8'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {settings.provider === 'ollama' && ollamaStatus?.running && ollamaStatus.models.length > 0 && (
                 <select
                   value={ollamaStatus.models.includes(settings.model) ? settings.model : ''}
@@ -809,6 +880,11 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                 placeholder={DEFAULT_MODELS[settings.provider] ?? ''}
                 className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
               />
+              {settings.provider === 'openrouter' && (
+                <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
+                  Any OpenRouter model slug — see <span className="text-white/60">openrouter.ai/models</span> for the full list.
+                </p>
+              )}
               {settings.provider === 'ollama' && settings.model.trim() !== '' && (
                 <div className="mt-2 flex items-center gap-2">
                   <ToolCallingBadge model={settings.model} />
@@ -943,6 +1019,54 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                 </div>
                 <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
                   Stored securely in your macOS keychain — never written to settings.
+                </p>
+                {saveKeySuccess && (
+                  <StatusMessage type="success" message="API key saved." className="mt-2" />
+                )}
+              </div>
+            )}
+
+            {settings.provider === 'openrouter' && (
+              <div>
+                <label className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                  <Key className="h-3 w-3" />
+                  OpenRouter API Key
+                </label>
+                {openrouterKeySet && (
+                  <div className="flex items-center justify-between gap-2 mb-2 bg-white/5 rounded p-2 border border-white/5">
+                    <div className="flex items-center gap-2 text-[11px] text-green-400">
+                      <CheckCircle className="h-3 w-3" />
+                      API key configured
+                    </div>
+                    <button
+                      onClick={handleClearOpenrouterKey}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Clear
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={openrouterKeyInput}
+                    onChange={(e) => setOpenrouterKeyInput(e.target.value)}
+                    placeholder={openrouterKeySet ? 'Enter a new key to replace…' : 'sk-or-…'}
+                    className="flex-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+                  />
+                  <button
+                    onClick={handleSaveOpenrouterKey}
+                    disabled={savingKey || openrouterKeyInput.trim() === ''}
+                    className="flex items-center gap-1 px-3 py-2 rounded text-xs text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors disabled:opacity-40"
+                  >
+                    {savingKey ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                    Save
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
+                  Get your key at <span className="text-white/60">openrouter.ai/keys</span>. Stored securely in your macOS keychain.
                 </p>
                 {saveKeySuccess && (
                   <StatusMessage type="success" message="API key saved." className="mt-2" />
@@ -1476,12 +1600,12 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-white/10 bg-black/50">
+      <div className="relative z-10 px-4 py-2.5 border-t border-white/[0.08] bg-white/[0.02]">
         <div className="flex items-center justify-between">
           <div className="text-[10px] text-white/40">
             {filteredPermissions.length} permissions
           </div>
-          <div className="text-[10px] text-white/40">
+          <div className="text-[10px] text-white/35">
             Click category to filter • ESC Close
           </div>
         </div>

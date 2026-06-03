@@ -9,6 +9,7 @@ interface HealthBadgeProps {
   onRecheck: () => void;
   onOpenSettings: () => void;
   onOpenProviderSetup: () => void;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 interface CheckRow {
@@ -32,8 +33,14 @@ export const HealthBadge = ({
   onRecheck,
   onOpenSettings,
   onOpenProviderSetup,
+  onExpandedChange,
 }: HealthBadgeProps) => {
   const [expanded, setExpanded] = useState(false);
+
+  const toggle = (v: boolean) => {
+    setExpanded(v);
+    onExpandedChange?.(v);
+  };
 
   const providerOk = health?.provider.ok ?? false;
   const mcpOk = (health?.mcp.serversStarted ?? 0) > 0;
@@ -76,7 +83,7 @@ export const HealthBadge = ({
     <div className="relative">
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => toggle(!expanded)}
         className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/[0.08] active:scale-[0.98] transition"
         aria-label="App health status"
         title="App readiness"
