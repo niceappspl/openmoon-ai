@@ -43,6 +43,7 @@ const STEP_ORDER: StepId[] = ['welcome', 'provider', 'permissions', 'ready'];
 const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   ollama: 'llama3.1',
+  anthropic: 'claude-haiku-3-5',
 };
 
 const DEFAULT_SECURITY: SecuritySettings = {
@@ -61,11 +62,13 @@ const DEFAULT_SETTINGS: AppSettings = {
 export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
   const [stepIndex, setStepIndex] = useState(0);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [provider, setProvider] = useState<'openai' | 'ollama'>('openai');
+  const [provider, setProvider] = useState<'openai' | 'ollama' | 'anthropic'>('openai');
   const [model, setModel] = useState(DEFAULT_MODELS.openai);
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState(DEFAULT_SETTINGS.ollamaBaseUrl);
   const [openaiKeyInput, setOpenaiKeyInput] = useState('');
   const [openaiKeySet, setOpenaiKeySet] = useState(false);
+  const [anthropicKeyInput, setAnthropicKeyInput] = useState('');
+  const [anthropicKeySet, setAnthropicKeySet] = useState(false);
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
   const [ollamaChecking, setOllamaChecking] = useState(false);
   const [validating, setValidating] = useState(false);
@@ -79,7 +82,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
       .then((loaded) => {
         const merged = { ...DEFAULT_SETTINGS, ...loaded, security: { ...DEFAULT_SECURITY, ...loaded.security } };
         setSettings(merged);
-        setProvider(merged.provider === 'ollama' ? 'ollama' : 'openai');
+        setProvider(merged.provider === 'ollama' ? 'ollama' : merged.provider === 'anthropic' ? 'anthropic' : 'openai');
         setModel(merged.model);
         setOllamaBaseUrl(merged.ollamaBaseUrl);
       })
@@ -87,6 +90,9 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
     invoke<boolean>('has_api_key_cmd', { provider: 'openai' })
       .then(setOpenaiKeySet)
       .catch(() => setOpenaiKeySet(false));
+    invoke<boolean>('has_api_key_cmd', { provider: 'anthropic' })
+      .then(setAnthropicKeySet)
+      .catch(() => setAnthropicKeySet(false));
   }, []);
 
   const checkOllama = useCallback((baseUrl: string) => {
@@ -103,7 +109,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
     }
   }, [currentStep, provider, ollamaBaseUrl, checkOllama]);
 
-  const handleSelectProvider = (next: 'openai' | 'ollama') => {
+  const handleSelectProvider = (next: 'openai' | 'ollama' | 'anthropic') => {
     setError(null);
     setProvider(next);
     setModel(DEFAULT_MODELS[next] ?? '');
@@ -131,6 +137,21 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
         }
       } else if (!openaiKeySet) {
         setError('Paste your OpenAI API key to continue.');
+        return;
+      }
+    } else if (provider === 'anthropic') {
+      const key = anthropicKeyInput.trim();
+      if (key) {
+        try {
+          await invoke('set_api_key', { provider: 'anthropic', key });
+          setAnthropicKeyInput('');
+          setAnthropicKeySet(true);
+        } catch (e) {
+          setError(String(e));
+          return;
+        }
+      } else if (!anthropicKeySet) {
+        setError('Paste your Anthropic API key to continue.');
         return;
       }
     } else if (!model.trim()) {
@@ -178,7 +199,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
             </div>
 
             <div className="flex gap-2">
-              {(['openai', 'ollama'] as const).map((p) => (
+              {(['openai', 'anthropic', 'ollama'] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => handleSelectProvider(p)}
@@ -188,7 +209,7 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
                       : 'text-white/60 hover:text-white/80 hover:bg-white/5 border-white/10'
                   }`}
                 >
-                  {p === 'openai' ? 'OpenAI' : 'Ollama (local)'}
+                  {p === 'openai' ? 'OpenAI' : p === 'anthropic' ? 'Anthropic' : 'Ollama (local)'}
                 </button>
               ))}
             </div>
@@ -211,6 +232,32 @@ export const Onboarding = ({ onComplete, onSkip }: OnboardingProps) => {
                   value={openaiKeyInput}
                   onChange={(e) => setOpenaiKeyInput(e.target.value)}
                   placeholder={openaiKeySet ? 'Enter a new key to replace…' : 'sk-…'}
+                  className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+                />
+                <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
+                  Stored securely in your macOS keychain — never written to settings.
+                </p>
+              </div>
+            )}
+
+            {provider === 'anthropic' && (
+              <div>
+                <label className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                  <Key className="h-3 w-3" />
+                  Anthropic API Key
+                </label>
+                {anthropicKeySet && (
+                  <div className="flex items-center gap-2 mb-2 text-[11px] text-green-400">
+                    <CheckCircle className="h-3 w-3" />
+                    API key already configured
+                  </div>
+                )}
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={anthropicKeyInput}
+                  onChange={(e) => setAnthropicKeyInput(e.target.value)}
+                  placeholder={anthropicKeySet ? 'Enter a new key to replace…' : 'sk-ant-…'}
                   className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
                 />
                 <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">

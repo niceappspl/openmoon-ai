@@ -345,7 +345,7 @@ fn extract_volume_level(text: &str) -> Option<String> {
     None
 }
 
-/// Builds the configured LLM provider from settings (OpenAI or local Ollama).
+/// Builds the configured LLM provider from settings (OpenAI, Anthropic, or local Ollama).
 fn build_provider(
     app_settings: &settings::AppSettings,
 ) -> Result<Box<dyn llm::LlmProvider>, String> {
@@ -354,6 +354,17 @@ fn build_provider(
             app_settings.ollama_base_url.clone(),
             app_settings.model.clone(),
         ))),
+        "anthropic" => {
+            let api_key = secrets::get_api_key("anthropic").ok_or_else(|| {
+                "No Anthropic API key configured. Add one in Settings → Provider.".to_string()
+            })?;
+            let model = if app_settings.model.is_empty() {
+                "claude-haiku-3-5".to_string()
+            } else {
+                app_settings.model.clone()
+            };
+            Ok(Box::new(llm::AnthropicProvider::new(api_key, model)))
+        }
         _ => {
             let api_key = secrets::get_api_key("openai").ok_or_else(|| {
                 "No OpenAI API key configured. Add one in Settings → Provider.".to_string()
@@ -611,6 +622,7 @@ async fn run_prompt_trigger(
     let tools_for_llm = flatten_tools(&all_tools);
     let app_settings = settings::load();
     let provider = build_provider(&app_settings)?;
+    let system_prompt_template = load_system_prompt_template(app);
 
     let manager_for_closure = manager.clone();
     let security = app_settings.security.clone();
@@ -635,7 +647,7 @@ async fn run_prompt_trigger(
         &[],
         &tools_for_llm,
         build_budget(&app_settings),
-        None,
+        Some(&system_prompt_template),
         execute_tool,
         on_step,
     )
@@ -743,6 +755,7 @@ async fn send_prompt(
 
     let app_settings = settings::load();
     let provider = build_provider(&app_settings)?;
+    let system_prompt_template = load_system_prompt_template(window.app_handle());
 
     let tools_for_llm = flatten_tools(&all_tools);
 
@@ -788,7 +801,7 @@ async fn send_prompt(
         &history,
         &tools_for_llm,
         build_budget(&app_settings),
-        None,
+        Some(&system_prompt_template),
         execute_tool,
         on_step,
     )
@@ -877,6 +890,27 @@ async fn probe_provider(
             }
             Ok(format!("Ollama reachable — model '{}' installed", model))
         }
+        "anthropic" => {
+            let api_key = secrets::get_api_key("anthropic")
+                .ok_or_else(|| "No Anthropic API key configured. Save a key first.".to_string())?;
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+            let response = client
+                .get("https://api.anthropic.com/v1/models")
+                .header("x-api-key", &api_key)
+                .header("anthropic-version", "2023-06-01")
+                .send()
+                .await
+                .map_err(|e| format!("Network error reaching Anthropic: {}", e))?;
+            match response.status().as_u16() {
+                200 => Ok("Anthropic reachable".to_string()),
+                401 => Err("Invalid Anthropic API key".to_string()),
+                429 => Err("Anthropic rate limit reached — try again shortly".to_string()),
+                code => Err(format!("Anthropic returned HTTP {}", code)),
+            }
+        }
         _ => {
             let api_key = secrets::get_api_key("openai")
                 .ok_or_else(|| "No OpenAI API key configured. Save a key first.".to_string())?;
@@ -909,6 +943,59 @@ async fn test_provider_connection(
     ollama_base_url: String,
 ) -> Result<String, String> {
     probe_provider(&provider, &model, &ollama_base_url).await
+}
+
+/// Loads the system prompt template: checks the user-override path in the app
+/// data directory first, then the bundled resource, then falls back to the
+/// compiled-in default.
+fn load_system_prompt_template(app: &tauri::AppHandle) -> String {
+    use tauri::Manager;
+
+    if let Ok(app_dir) = app.path().app_data_dir() {
+        let user_path = app_dir.join("system_prompt.md");
+        if let Ok(content) = fs::read_to_string(&user_path) {
+            if !content.trim().is_empty() {
+                return content;
+            }
+        }
+    }
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let bundled_path = resource_dir.join("system_prompt.md");
+        if let Ok(content) = fs::read_to_string(&bundled_path) {
+            if !content.trim().is_empty() {
+                return content;
+            }
+        }
+    }
+
+    llm::DEFAULT_SYSTEM_PROMPT_TEMPLATE.to_string()
+}
+
+/// Returns the active system prompt template (user override or bundled default).
+#[tauri::command]
+async fn get_system_prompt(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(load_system_prompt_template(&app))
+}
+
+/// Saves a custom system prompt to the user data directory. Pass an empty
+/// string to reset to the bundled default.
+#[tauri::command]
+async fn save_system_prompt(app: tauri::AppHandle, prompt: String) -> Result<(), String> {
+    use tauri::Manager;
+
+    let app_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    fs::create_dir_all(&app_dir)
+        .map_err(|e| format!("Failed to create app data dir: {}", e))?;
+    let path = app_dir.join("system_prompt.md");
+    if prompt.trim().is_empty() {
+        let _ = fs::remove_file(&path);
+        return Ok(());
+    }
+    fs::write(&path, &prompt).map_err(|e| format!("Failed to save system prompt: {}", e))
 }
 
 /// Outcome of a single readiness probe surfaced in the startup health check.
@@ -1736,7 +1823,9 @@ fn main() {
             logging::get_log_path,
             logging::open_logs,
             check_for_updates,
-            install_update
+            install_update,
+            get_system_prompt,
+            save_system_prompt,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

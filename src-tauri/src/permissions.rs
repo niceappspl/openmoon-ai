@@ -89,6 +89,9 @@ mod imp {
             "accessibility" => "Privacy_Accessibility",
             "screen_recording" => "Privacy_ScreenCapture",
             "automation" => "Privacy_Automation",
+            "microphone" => "Privacy_Microphone",
+            "files" => "Privacy_FilesAndFolders",
+            "speech_recognition" => "Privacy_SpeechRecognition",
             other => return Err(format!("unknown permission kind: {other}")),
         };
         let url = format!("x-apple.systempreferences:com.apple.preference.security?{anchor}");

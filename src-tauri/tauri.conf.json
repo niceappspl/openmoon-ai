@@ -11,6 +11,7 @@
   "bundle": {
     "active": true,
     "targets": ["dmg", "app"],
+    "resources": ["resources/system_prompt.md"],
     "macOS": {
       "minimumSystemVersion": "10.15",
       "entitlements": "entitlements.plist"

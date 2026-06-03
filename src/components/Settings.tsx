@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Shield, Settings as SettingsIcon, Info, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle, FileText, Gauge, History as HistoryIcon, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { X, Shield, Settings as SettingsIcon, CheckCircle, XCircle, AlertTriangle, Bot, Cog, FolderOpen, Globe, Music, Headphones, Chrome, Video, Mic, MessageSquare, Wifi, Bluetooth, ShieldAlert, Clock, ScrollText, Plus, Trash2, Power, Download, Loader2, Key, Plug, Wrench, HelpCircle, FileText, Gauge, History as HistoryIcon, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { Spinner, EmptyState, StatusMessage } from './ui';
 import { supportsToolCalling, RECOMMENDED_TOOL_MODELS } from '../utils/ollamaModels';
 
@@ -63,6 +63,7 @@ interface OllamaStatus {
 const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   ollama: 'llama3.1',
+  anthropic: 'claude-haiku-3-5',
 };
 
 const DEFAULT_SECURITY: SecuritySettings = {
@@ -89,7 +90,7 @@ interface Permission {
   category: 'system' | 'apps' | 'files' | 'network' | 'media' | 'automation';
   required: boolean;
   status: 'granted' | 'denied' | 'unknown';
-  instructions: string;
+  settingsKind?: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -101,7 +102,7 @@ const PERMISSIONS: Permission[] = [
     category: 'automation',
     required: true,
     status: 'granted',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Automation > openMOON',
+    settingsKind: 'automation',
     icon: Bot
   },
   {
@@ -111,7 +112,7 @@ const PERMISSIONS: Permission[] = [
     category: 'automation',
     required: true,
     status: 'granted',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Accessibility > openMOON',
+    settingsKind: 'accessibility',
     icon: Cog
   },
   {
@@ -121,7 +122,7 @@ const PERMISSIONS: Permission[] = [
     category: 'files',
     required: true,
     status: 'denied',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Files and Folders > openMOON > Documents Folder',
+    settingsKind: 'files',
     icon: FolderOpen
   },
   {
@@ -131,7 +132,7 @@ const PERMISSIONS: Permission[] = [
     category: 'apps',
     required: false,
     status: 'unknown',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Automation > openMOON > Safari',
+    settingsKind: 'automation',
     icon: Globe
   },
   {
@@ -141,7 +142,7 @@ const PERMISSIONS: Permission[] = [
     category: 'media',
     required: false,
     status: 'unknown',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Automation > openMOON > Music',
+    settingsKind: 'automation',
     icon: Music
   },
   {
@@ -151,7 +152,7 @@ const PERMISSIONS: Permission[] = [
     category: 'media',
     required: false,
     status: 'unknown',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Automation > openMOON > Spotify',
+    settingsKind: 'automation',
     icon: Headphones
   },
   {
@@ -161,7 +162,7 @@ const PERMISSIONS: Permission[] = [
     category: 'apps',
     required: false,
     status: 'unknown',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Automation > openMOON > Google Chrome',
+    settingsKind: 'automation',
     icon: Chrome
   },
   {
@@ -171,7 +172,7 @@ const PERMISSIONS: Permission[] = [
     category: 'media',
     required: false,
     status: 'granted',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Screen Recording > openMOON',
+    settingsKind: 'screen_recording',
     icon: Video
   },
   {
@@ -181,7 +182,7 @@ const PERMISSIONS: Permission[] = [
     category: 'system',
     required: false,
     status: 'granted',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Microphone > openMOON',
+    settingsKind: 'microphone',
     icon: Mic
   },
   {
@@ -191,7 +192,7 @@ const PERMISSIONS: Permission[] = [
     category: 'system',
     required: false,
     status: 'granted',
-    instructions: 'System Preferences > Security & Privacy > Privacy > Speech Recognition > openMOON',
+    settingsKind: 'speech_recognition',
     icon: MessageSquare
   },
   {
@@ -201,7 +202,6 @@ const PERMISSIONS: Permission[] = [
     category: 'network',
     required: true,
     status: 'granted',
-    instructions: 'Automatically granted for applications',
     icon: Wifi
   },
   {
@@ -211,7 +211,6 @@ const PERMISSIONS: Permission[] = [
     category: 'network',
     required: false,
     status: 'unknown',
-    instructions: 'Install: brew install blueutil',
     icon: Bluetooth
   }
 ];
@@ -256,6 +255,12 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
   const [pullMessage, setPullMessage] = useState<string | null>(null);
   const [openaiKeyInput, setOpenaiKeyInput] = useState('');
   const [openaiKeySet, setOpenaiKeySet] = useState(false);
+  const [anthropicKeyInput, setAnthropicKeyInput] = useState('');
+  const [anthropicKeySet, setAnthropicKeySet] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [systemPromptInput, setSystemPromptInput] = useState('');
+  const [savingSystemPrompt, setSavingSystemPrompt] = useState(false);
+  const [systemPromptSaved, setSystemPromptSaved] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -285,10 +290,16 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
     invoke<boolean>('has_api_key_cmd', { provider: 'openai' })
       .then(setOpenaiKeySet)
       .catch(() => setOpenaiKeySet(false));
+    invoke<boolean>('has_api_key_cmd', { provider: 'anthropic' })
+      .then(setAnthropicKeySet)
+      .catch(() => setAnthropicKeySet(false));
   };
 
   useEffect(() => {
     refreshKeyStatus();
+    invoke<string>('get_system_prompt')
+      .then((t) => { setSystemPrompt(t); setSystemPromptInput(t); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -392,6 +403,50 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
       .catch(() => {});
   };
 
+  const handleSaveAnthropicKey = () => {
+    const key = anthropicKeyInput.trim();
+    if (!key) return;
+    setSavingKey(true);
+    setSaveKeySuccess(false);
+    setTestResult(null);
+    invoke('set_api_key', { provider: 'anthropic', key })
+      .then(() => {
+        setAnthropicKeyInput('');
+        refreshKeyStatus();
+        setSaveKeySuccess(true);
+        setTimeout(() => setSaveKeySuccess(false), 2500);
+      })
+      .catch(() => {})
+      .finally(() => setSavingKey(false));
+  };
+
+  const handleClearAnthropicKey = () => {
+    setTestResult(null);
+    invoke('remove_api_key', { provider: 'anthropic' })
+      .then(refreshKeyStatus)
+      .catch(() => {});
+  };
+
+  const handleSaveSystemPrompt = () => {
+    setSavingSystemPrompt(true);
+    setSystemPromptSaved(false);
+    invoke('save_system_prompt', { prompt: systemPromptInput })
+      .then(() => {
+        setSystemPrompt(systemPromptInput);
+        setSystemPromptSaved(true);
+        setTimeout(() => setSystemPromptSaved(false), 2500);
+      })
+      .catch(() => {})
+      .finally(() => setSavingSystemPrompt(false));
+  };
+
+  const handleResetSystemPrompt = () => {
+    invoke('save_system_prompt', { prompt: '' })
+      .then(() => invoke<string>('get_system_prompt'))
+      .then((t) => { setSystemPrompt(t); setSystemPromptInput(t); })
+      .catch(() => {});
+  };
+
   const handleTestConnection = () => {
     setTesting(true);
     setTestResult(null);
@@ -451,17 +506,6 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
     ? PERMISSIONS.filter(p => p.category === selectedCategory)
     : PERMISSIONS;
 
-  const getStatusIcon = (status: Permission['status']) => {
-    switch (status) {
-      case 'granted':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'denied':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'unknown':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    }
-  };
-
   const getStatusText = (status: Permission['status']) => {
     switch (status) {
       case 'granted':
@@ -470,17 +514,6 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
         return 'Denied';
       case 'unknown':
         return 'Unknown';
-    }
-  };
-
-  const getStatusColor = (status: Permission['status']) => {
-    switch (status) {
-      case 'granted':
-        return 'text-green-400';
-      case 'denied':
-        return 'text-red-400';
-      case 'unknown':
-        return 'text-yellow-400';
     }
   };
 
@@ -613,39 +646,61 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
 
             {/* Permissions List */}
             <div className="flex-1 overflow-y-auto p-3">
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {filteredPermissions.map((permission) => (
                   <div
                     key={permission.id}
-                    className="bg-white/5 border border-white/10 rounded-lg p-3 hover:bg-white/8 transition-colors"
+                    className={`border rounded-lg px-3 py-2.5 transition-colors ${
+                      permission.status === 'granted'
+                        ? 'bg-white/3 border-white/8'
+                        : permission.status === 'denied'
+                        ? 'bg-red-500/5 border-red-500/20'
+                        : 'bg-white/5 border-white/10'
+                    }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <permission.icon className="h-5 w-5 text-white/70 mt-0.5 flex-shrink-0" />
+                    <div className="flex items-center gap-3">
+                      <div className={`p-1.5 rounded-md flex-shrink-0 ${
+                        permission.status === 'granted' ? 'bg-green-500/10' : 'bg-white/5'
+                      }`}>
+                        <permission.icon className={`h-3.5 w-3.5 ${
+                          permission.status === 'granted' ? 'text-green-400' : 'text-white/50'
+                        }`} />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="text-xs font-medium text-white/90 truncate">{permission.name}</h4>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium text-white/90 truncate">{permission.name}</span>
                           {permission.required && (
-                            <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[10px] rounded flex-shrink-0">
-                              Required
+                            <span className="px-1 py-0.5 bg-white/8 text-white/40 text-[9px] rounded uppercase tracking-wide flex-shrink-0">
+                              req
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-white/60 mb-2 leading-relaxed">{permission.description}</p>
-                        <div className="flex items-center gap-1 text-[10px] mb-2">
-                          {getStatusIcon(permission.status)}
-                          <span className={getStatusColor(permission.status)}>
-                            {getStatusText(permission.status)}
-                          </span>
+                        <p className="text-[10px] text-white/40 truncate">{permission.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          permission.status === 'granted'
+                            ? 'bg-green-500/15 text-green-400'
+                            : permission.status === 'denied'
+                            ? 'bg-red-500/15 text-red-400'
+                            : 'bg-yellow-500/15 text-yellow-400'
+                        }`}>
+                          {permission.status === 'granted'
+                            ? <CheckCircle className="h-3 w-3" />
+                            : permission.status === 'denied'
+                            ? <XCircle className="h-3 w-3" />
+                            : <AlertTriangle className="h-3 w-3" />
+                          }
+                          <span>{getStatusText(permission.status)}</span>
                         </div>
-                        
-                        <div className="bg-white/5 rounded p-2 border border-white/5">
-                          <div className="flex items-start gap-2">
-                            <Info className="h-3 w-3 text-blue-400 mt-0.5 flex-shrink-0" />
-                            <div className="text-[10px] text-white/50 leading-relaxed">
-                              <span className="font-medium text-blue-400">How to grant:</span> {permission.instructions}
-                            </div>
-                          </div>
-                        </div>
+                        {permission.status !== 'granted' && permission.settingsKind && (
+                          <button
+                            onClick={() => invoke('open_permission_settings', { kind: permission.settingsKind })}
+                            className="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-[10px] font-medium rounded border border-blue-500/20 transition-colors whitespace-nowrap"
+                          >
+                            Open Settings
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -691,7 +746,7 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                 AI Provider
               </h3>
               <div className="flex gap-2">
-                {(['openai', 'ollama'] as const).map((provider) => (
+                {(['openai', 'anthropic', 'ollama'] as const).map((provider) => (
                   <button
                     key={provider}
                     onClick={() => handleProviderChange(provider)}
@@ -701,7 +756,7 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                         : 'text-white/60 hover:text-white/80 hover:bg-white/5 border-white/10'
                     }`}
                   >
-                    {provider === 'openai' ? 'OpenAI' : 'Ollama (local)'}
+                    {provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'Ollama (local)'}
                   </button>
                 ))}
               </div>
@@ -847,6 +902,54 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
               </div>
             )}
 
+            {settings.provider === 'anthropic' && (
+              <div>
+                <label className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                  <Key className="h-3 w-3" />
+                  Anthropic API Key
+                </label>
+                {anthropicKeySet && (
+                  <div className="flex items-center justify-between gap-2 mb-2 bg-white/5 rounded p-2 border border-white/5">
+                    <div className="flex items-center gap-2 text-[11px] text-green-400">
+                      <CheckCircle className="h-3 w-3" />
+                      API key configured
+                    </div>
+                    <button
+                      onClick={handleClearAnthropicKey}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Clear
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={anthropicKeyInput}
+                    onChange={(e) => setAnthropicKeyInput(e.target.value)}
+                    placeholder={anthropicKeySet ? 'Enter a new key to replace…' : 'sk-ant-…'}
+                    className="flex-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50"
+                  />
+                  <button
+                    onClick={handleSaveAnthropicKey}
+                    disabled={savingKey || anthropicKeyInput.trim() === ''}
+                    className="flex items-center gap-1 px-3 py-2 rounded text-xs text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors disabled:opacity-40"
+                  >
+                    {savingKey ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                    Save
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[10px] text-white/40 leading-relaxed">
+                  Stored securely in your macOS keychain — never written to settings.
+                </p>
+                {saveKeySuccess && (
+                  <StatusMessage type="success" message="API key saved." className="mt-2" />
+                )}
+              </div>
+            )}
+
             <div>
               <button
                 onClick={handleTestConnection}
@@ -863,6 +966,45 @@ export const Settings = ({ onClose, onReplay }: SettingsProps) => {
                   className="mt-2"
                 />
               )}
+            </div>
+
+            <div className="pt-2 border-t border-white/10">
+              <h3 className="text-xs font-medium text-white/80 mb-2 flex items-center gap-2">
+                <FileText className="h-3 w-3" />
+                System Prompt
+              </h3>
+              <p className="text-[10px] text-white/40 mb-3 leading-relaxed">
+                Customize the AI system prompt. Edit and save to override the bundled default. Leave empty to reset to default.
+              </p>
+              <textarea
+                value={systemPromptInput}
+                onChange={(e) => setSystemPromptInput(e.target.value)}
+                rows={8}
+                className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:border-blue-500/50 font-mono resize-y"
+                placeholder="System prompt template…"
+                spellCheck={false}
+              />
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={handleSaveSystemPrompt}
+                  disabled={savingSystemPrompt || systemPromptInput === systemPrompt}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors disabled:opacity-40"
+                >
+                  {savingSystemPrompt ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                  Save
+                </button>
+                <button
+                  onClick={handleResetSystemPrompt}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs text-white/60 border border-white/10 hover:bg-white/5 transition-colors"
+                  title="Reset to bundled default"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Reset to default
+                </button>
+                {systemPromptSaved && (
+                  <StatusMessage type="success" message="Saved." className="ml-1" />
+                )}
+              </div>
             </div>
 
             <div className="pt-2 border-t border-white/10">

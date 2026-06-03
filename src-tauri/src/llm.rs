@@ -73,24 +73,35 @@ pub struct Budget {
     pub input_price_per_mtok: Option<f64>,
 }
 
-/// USD price per 1M input tokens for known OpenAI models. Returns `None` for
-/// other providers or unknown models so cost enforcement is skipped rather than
-/// guessed. Mirrors the frontend price table in `src/utils/tokens.ts`.
+/// USD price per 1M input tokens for known models. Returns `None` for unknown
+/// models so cost enforcement is skipped rather than guessed. Mirrors the
+/// frontend price table in `src/utils/tokens.ts`.
 pub fn input_price_per_mtok(provider: &str, model: &str) -> Option<f64> {
-    if provider != "openai" {
-        return None;
+    match provider {
+        "openai" => {
+            let price = match model {
+                "gpt-4o-mini" => 0.15,
+                "gpt-4o" => 2.5,
+                "gpt-4.1" => 2.0,
+                "gpt-4.1-mini" => 0.4,
+                "gpt-4.1-nano" => 0.1,
+                "gpt-4-turbo" => 10.0,
+                "gpt-3.5-turbo" => 0.5,
+                _ => return None,
+            };
+            Some(price)
+        }
+        "anthropic" => {
+            let price = match model {
+                "claude-opus-4-5" => 15.0,
+                "claude-sonnet-4-5" => 3.0,
+                "claude-haiku-3-5" => 0.8,
+                _ => return None,
+            };
+            Some(price)
+        }
+        _ => None,
     }
-    let price = match model {
-        "gpt-4o-mini" => 0.15,
-        "gpt-4o" => 2.5,
-        "gpt-4.1" => 2.0,
-        "gpt-4.1-mini" => 0.4,
-        "gpt-4.1-nano" => 0.1,
-        "gpt-4-turbo" => 10.0,
-        "gpt-3.5-turbo" => 0.5,
-        _ => return None,
-    };
-    Some(price)
 }
 
 /// Best-effort input-token estimate for the messages sent in one step, using a
@@ -133,12 +144,9 @@ pub trait LlmProvider: Send + Sync {
     ) -> Result<ChatStepResult, String>;
 }
 
-fn build_system_prompt(tool_context: &str) -> String {
-    let current_date = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let current_time = chrono::Local::now().format("%H:%M:%S").to_string();
-    let current_weekday = chrono::Local::now().format("%A").to_string();
-
-    format!(
+/// The default system prompt template. Placeholders: `{current_date}`,
+/// `{current_weekday}`, `{current_time}`, `{tool_context}`.
+pub const DEFAULT_SYSTEM_PROMPT_TEMPLATE: &str =
 "You are openMOON - an intelligent AI system controller for macOS. Your job is to understand user intent and accomplish the user's goal by calling the most appropriate tools.
 
 CURRENT DATE AND TIME:
@@ -297,25 +305,32 @@ CONTEXT AWARENESS:
 AVAILABLE TOOLS:
 {tool_context}
 
-You are an INTELLIGENT AGENT. Understand the user's true intent and chain tools as needed to fulfill it, then summarize the outcome.",
-            tool_context = tool_context,
-            current_date = current_date,
-            current_weekday = current_weekday,
-            current_time = current_time
-        )
+You are an INTELLIGENT AGENT. Understand the user's true intent and chain tools as needed to fulfill it, then summarize the outcome.";
+
+fn build_system_prompt(template: &str, tool_context: &str) -> String {
+    let current_date = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let current_time = chrono::Local::now().format("%H:%M:%S").to_string();
+    let current_weekday = chrono::Local::now().format("%A").to_string();
+    template
+        .replace("{current_date}", &current_date)
+        .replace("{current_weekday}", &current_weekday)
+        .replace("{current_time}", &current_time)
+        .replace("{tool_context}", tool_context)
 }
 
 /// Runs the agentic loop: model -> tool call(s) -> tool result(s) -> next step
 /// until the model returns a final assistant message with no tool calls or the
 /// step limit is reached. `execute_tool` performs a single tool call and returns
 /// the (raw) tool output text; `on_step` receives progress events. The model
-/// step is delegated to the configured `LlmProvider`.
+/// step is delegated to the configured `LlmProvider`. `system_prompt_template`
+/// overrides the bundled default when `Some`; pass `None` to use the default.
 pub async fn run_agent<F, Fut, E>(
     provider: &dyn LlmProvider,
     prompt: &str,
     history: &[ChatMessage],
     tools: &serde_json::Value,
     budget: Budget,
+    system_prompt_template: Option<&str>,
     execute_tool: F,
     mut on_step: E,
 ) -> Result<String, String>
@@ -325,7 +340,8 @@ where
     E: FnMut(AgentStep),
 {
     let tool_context = generate_tool_context(tools)?;
-    let system_prompt = build_system_prompt(&tool_context);
+    let template = system_prompt_template.unwrap_or(DEFAULT_SYSTEM_PROMPT_TEMPLATE);
+    let system_prompt = build_system_prompt(template, &tool_context);
 
     let mut messages: Vec<ProviderMessage> = Vec::new();
     messages.push(ProviderMessage::System(system_prompt));
@@ -796,6 +812,190 @@ impl LlmProvider for OllamaProvider {
 
         Ok(ChatStepResult {
             content,
+            tool_calls,
+        })
+    }
+}
+
+/// Anthropic-backed provider using the `/v1/messages` API with tool use.
+pub struct AnthropicProvider {
+    client: reqwest::Client,
+    api_key: String,
+    model: String,
+}
+
+impl AnthropicProvider {
+    pub fn new(api_key: String, model: String) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            api_key,
+            model,
+        }
+    }
+}
+
+/// Converts `ProviderMessage` slice to Anthropic format, extracting the system
+/// message separately (Anthropic takes it as a top-level field) and batching
+/// consecutive `Tool` results into a single user message with `tool_result`
+/// content blocks (as required by the Anthropic Messages API).
+fn to_anthropic_messages(
+    messages: &[ProviderMessage],
+) -> (Option<String>, Vec<serde_json::Value>) {
+    let mut system_content: Option<String> = None;
+    let mut out: Vec<serde_json::Value> = Vec::new();
+
+    let mut i = 0;
+    while i < messages.len() {
+        match &messages[i] {
+            ProviderMessage::System(content) => {
+                system_content = Some(content.clone());
+                i += 1;
+            }
+            ProviderMessage::User(content) => {
+                out.push(serde_json::json!({ "role": "user", "content": content }));
+                i += 1;
+            }
+            ProviderMessage::Assistant {
+                content,
+                tool_calls,
+            } => {
+                let mut blocks: Vec<serde_json::Value> = Vec::new();
+                if let Some(text) = content {
+                    if !text.is_empty() {
+                        blocks.push(serde_json::json!({ "type": "text", "text": text }));
+                    }
+                }
+                for tc in tool_calls {
+                    let input: serde_json::Value = serde_json::from_str(&tc.arguments)
+                        .unwrap_or_else(|_| serde_json::json!({}));
+                    blocks.push(serde_json::json!({
+                        "type": "tool_use",
+                        "id": tc.id,
+                        "name": tc.name,
+                        "input": input,
+                    }));
+                }
+                if blocks.is_empty() {
+                    blocks.push(serde_json::json!({ "type": "text", "text": "" }));
+                }
+                out.push(serde_json::json!({ "role": "assistant", "content": blocks }));
+                i += 1;
+            }
+            ProviderMessage::Tool { .. } => {
+                let mut result_blocks: Vec<serde_json::Value> = Vec::new();
+                while i < messages.len() {
+                    if let ProviderMessage::Tool {
+                        tool_call_id,
+                        content,
+                    } = &messages[i]
+                    {
+                        result_blocks.push(serde_json::json!({
+                            "type": "tool_result",
+                            "tool_use_id": tool_call_id,
+                            "content": content,
+                        }));
+                        i += 1;
+                    } else {
+                        break;
+                    }
+                }
+                out.push(serde_json::json!({ "role": "user", "content": result_blocks }));
+            }
+        }
+    }
+
+    (system_content, out)
+}
+
+fn to_anthropic_tools(tools: &serde_json::Value) -> Result<Vec<serde_json::Value>, String> {
+    let tools_array = tools["tools"].as_array().ok_or("Invalid tools format")?;
+    Ok(tools_array
+        .iter()
+        .filter_map(|tool| {
+            let name = tool["name"].as_str()?;
+            let description = tool["description"].as_str().unwrap_or("");
+            Some(serde_json::json!({
+                "name": name,
+                "description": description,
+                "input_schema": tool["inputSchema"].clone(),
+            }))
+        })
+        .collect())
+}
+
+#[async_trait::async_trait]
+impl LlmProvider for AnthropicProvider {
+    async fn chat_step(
+        &self,
+        messages: &[ProviderMessage],
+        tools: &serde_json::Value,
+    ) -> Result<ChatStepResult, String> {
+        let (system_content, anthropic_messages) = to_anthropic_messages(messages);
+        let anthropic_tools = to_anthropic_tools(tools)?;
+
+        let mut body = serde_json::json!({
+            "model": self.model,
+            "max_tokens": 4096,
+            "messages": anthropic_messages,
+            "tools": anthropic_tools,
+        });
+        if let Some(system) = system_content {
+            body["system"] = serde_json::Value::String(system);
+        }
+
+        let response = self
+            .client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Anthropic request failed: {}", e))?;
+
+        let status = response.status();
+        let payload: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse Anthropic response: {}", e))?;
+
+        if !status.is_success() {
+            let detail = payload["error"]["message"]
+                .as_str()
+                .unwrap_or("unknown error")
+                .to_string();
+            return Err(format!("Anthropic error ({}): {}", status, detail));
+        }
+
+        let content_blocks = payload["content"]
+            .as_array()
+            .ok_or_else(|| "Missing content in Anthropic response".to_string())?;
+
+        let mut text_content: Option<String> = None;
+        let mut tool_calls: Vec<ToolCall> = Vec::new();
+
+        for block in content_blocks {
+            match block["type"].as_str() {
+                Some("text") => {
+                    if let Some(text) = block["text"].as_str() {
+                        if !text.is_empty() {
+                            text_content = Some(text.to_string());
+                        }
+                    }
+                }
+                Some("tool_use") => {
+                    let id = block["id"].as_str().unwrap_or("").to_string();
+                    let name = block["name"].as_str().unwrap_or("").to_string();
+                    let arguments = block["input"].to_string();
+                    tool_calls.push(ToolCall { id, name, arguments });
+                }
+                _ => {}
+            }
+        }
+
+        Ok(ChatStepResult {
+            content: text_content,
             tool_calls,
         })
     }
