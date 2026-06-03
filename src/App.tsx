@@ -12,6 +12,7 @@ import { useWindowManager } from './hooks/useWindowManager';
 import { useProviderStatus } from './hooks/useProviderStatus';
 import { useHealthCheck } from './hooks/useHealthCheck';
 import { useTokenCount } from './hooks/useTokenCount';
+import { useRotatingPlaceholder } from './hooks/useRotatingPlaceholder';
 import { formatCostUsd } from './utils/tokens';
 import { TopBar } from './components/TopBar';
 import { CommandMenu } from './components/CommandMenu';
@@ -72,6 +73,9 @@ function App() {
   const health = useHealthCheck(!mcpLoading);
   const ramUsage = useRamMonitor();
   const { tokens, costUsd } = useTokenCount(`${input}${response ? `\n${response}` : ''}`);
+  const { placeholder: rotatingPlaceholder, isFading: placeholderFading } = useRotatingPlaceholder(
+    !!input.trim() || isLoading
+  );
   const { adjustWindowSizeAndPosition } = useWindowManager(
     containerRef,
     [response, showSuggestions, showCommandMenu, input, filteredSuggestions.length, showTestCommands, showSettings, agentSteps.length, approval, recordedSteps.length, showOnboarding, providerConfigured, agentError],
@@ -669,7 +673,8 @@ function App() {
                   onKeyDown={handleKeyDown}
                   onSubmit={handleSubmit}
                   disabled={isLoading || mcpLoading || appsLoading}
-                  placeholder="Ask me to automate anything..."
+                  placeholder={rotatingPlaceholder}
+                  placeholderFading={placeholderFading}
                   textareaRef={textareaRef}
                   isLoading={isLoading || mcpLoading || appsLoading}
                 />

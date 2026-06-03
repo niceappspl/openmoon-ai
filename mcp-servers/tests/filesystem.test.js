@@ -8,7 +8,7 @@ export default [
   {
     name: 'write_file',
     description: 'Write test file to /tmp',
-    args: { path: '/tmp/moonos-test.txt', content: 'MoonOS Test File Content' }
+    args: { path: '/tmp/moonos-test.txt', content: 'openMOON AI Test File Content' }
   },
   {
     name: 'list_directory',

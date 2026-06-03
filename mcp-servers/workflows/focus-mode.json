@@ -1,0 +1,40 @@
+{
+  "id": "focus-mode",
+  "name": "Focus Mode",
+  "description": "Close distracting apps, play focus music and start a 25-minute pomodoro",
+  "icon": "🎯",
+  "steps": [
+    {
+      "action": "quit_application",
+      "params": { "app": "Slack" }
+    },
+    {
+      "action": "quit_application",
+      "params": { "app": "Messages" },
+      "delay": 300
+    },
+    {
+      "action": "open_app",
+      "params": { "app": "Spotify" },
+      "delay": 500
+    },
+    {
+      "action": "play_pause_media",
+      "params": {},
+      "delay": 1000
+    },
+    {
+      "action": "start_pomodoro",
+      "params": { "duration_minutes": 25 },
+      "delay": 500
+    },
+    {
+      "action": "show_notification",
+      "params": {
+        "title": "Focus Mode Active",
+        "message": "25-minute pomodoro started. You've got this!"
+      },
+      "delay": 300
+    }
+  ]
+}

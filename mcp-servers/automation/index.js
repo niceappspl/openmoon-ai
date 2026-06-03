@@ -2405,22 +2405,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const script = `
             tell application "Notes"
               try
-                set noteList to {}
+                set output to ""
                 set noteCount to 0
                 
-                repeat with note in notes
+                repeat with aNote in notes
                   if noteCount >= ${limit} then exit repeat
                   
                   try
-                    set noteInfo to "Title: " & name of note & "\\nContent: " & (body of note as string) & "\\n---"
-                    set noteList to noteList & {noteInfo}
+                    set noteTitle to name of aNote
+                    set noteBody to body of aNote as string
+                    set output to output & "### " & noteTitle & "\\n" & noteBody & "\\n\\n"
                     set noteCount to noteCount + 1
                   on error
                     -- Skip problematic notes
                   end try
                 end repeat
                 
-                return "SUCCESS:" & (count of noteList)
+                if noteCount = 0 then
+                  return "EMPTY"
+                else
+                  return "SUCCESS:" & noteCount & "\\n" & output
+                end if
               on error errMsg
                 return "ERROR:" & errMsg
               end try
@@ -2429,13 +2434,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           
           const result = await runAppleScript(script);
           
-          if (result.startsWith("SUCCESS:")) {
-            const count = parseInt(result.split(":")[1]);
+          if (result === "EMPTY") {
+            return {
+              content: [{ type: "text", text: `📝 No notes found` }],
+            };
+          } else if (result.startsWith("SUCCESS:")) {
+            const newlineIdx = result.indexOf("\n");
+            const count = parseInt(result.substring(8, newlineIdx));
+            const notesText = result.substring(newlineIdx + 1);
             return {
               content: [
                 {
                   type: "text",
-                  text: `📝 Found ${count} notes`,
+                  text: `📝 Found ${count} notes:\n\n${notesText}`,
                 },
               ],
             };
@@ -2519,9 +2530,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 set contactList to {}
                 set searchTerm to "${args.query.replace(/"/g, '\\"')}"
                 
-                repeat with person in people
+                repeat with aPerson in people
                   try
-                    set personName to name of person
+                    set personName to name of aPerson
                     if personName contains searchTerm then
                       set contactInfo to "Name: " & personName & "\\n---"
                       set contactList to contactList & {contactInfo}

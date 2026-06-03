@@ -8,6 +8,7 @@ interface InputFieldProps {
   onSubmit: (e: React.FormEvent) => void;
   disabled: boolean;
   placeholder: string;
+  placeholderFading?: boolean;
   textareaRef: RefObject<HTMLTextAreaElement>;
   isLoading: boolean;
 }
@@ -19,6 +20,7 @@ export const InputField = ({
   onSubmit,
   disabled,
   placeholder,
+  placeholderFading = false,
   textareaRef,
   isLoading
 }: InputFieldProps) => {
@@ -31,7 +33,7 @@ export const InputField = ({
           onChange={onChange}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
-          className="w-full bg-transparent border-none text-white placeholder-white/40 focus:outline-none text-[15px] font-normal resize-none overflow-y-auto disabled:opacity-50 transition-all duration-200"
+          className={`w-full bg-transparent border-none text-white focus:outline-none text-[15px] font-normal resize-none overflow-y-auto disabled:opacity-50 transition-all duration-200 ${placeholderFading ? 'placeholder-white/10' : 'placeholder-white/40'}`}
           disabled={disabled}
           autoComplete="off"
           autoCorrect="off"

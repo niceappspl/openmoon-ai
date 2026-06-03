@@ -7,8 +7,8 @@ export default [
   },
   {
     name: 'search_web',
-    description: 'Search Google for MoonOS',
-    args: { query: 'MoonOS', engine: 'google' }
+    description: 'Search Google for openMOON AI',
+    args: { query: 'openMOON AI', engine: 'google' }
   },
   {
     name: 'get_active_tab_info',

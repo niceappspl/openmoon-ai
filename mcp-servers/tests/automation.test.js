@@ -23,7 +23,7 @@ export default [
   {
     name: 'run_shell_command',
     description: 'Run echo command',
-    args: { command: 'echo "MoonOS Test"' }
+    args: { command: 'echo "openMOON AI Test"' }
   },
   {
     name: 'set_volume',
@@ -38,7 +38,7 @@ export default [
   {
     name: 'set_clipboard',
     description: 'Set clipboard to test text',
-    args: { text: 'MoonOS Test Clipboard' }
+    args: { text: 'openMOON AI Test Clipboard' }
   },
   {
     name: 'take_screenshot',
@@ -48,7 +48,7 @@ export default [
   {
     name: 'show_notification',
     description: 'Show test notification',
-    args: { title: 'MoonOS', message: 'Test notification from automation' }
+    args: { title: 'openMOON AI', message: 'Test notification from automation' }
   },
   {
     name: 'get_system_info',
@@ -133,7 +133,7 @@ export default [
   {
     name: 'messages_send',
     description: 'Send test message',
-    args: { to: 'test@example.com', message: 'Test message from MoonOS' }
+    args: { to: 'test@example.com', message: 'Test message from openMOON AI' }
   },
   {
     name: 'reminders_list',
@@ -143,7 +143,7 @@ export default [
   {
     name: 'reminders_create',
     description: 'Create reminder',
-    args: { title: 'Test reminder from MoonOS' }
+    args: { title: 'Test reminder from openMOON AI' }
   },
   {
     name: 'notes_list',
@@ -153,7 +153,7 @@ export default [
   {
     name: 'notes_create',
     description: 'Create note',
-    args: { title: 'Test Note', content: 'This is a test note from MoonOS' }
+    args: { title: 'Test Note', content: 'This is a test note from openMOON AI' }
   },
   {
     name: 'contacts_search',

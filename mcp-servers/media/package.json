@@ -1,7 +1,7 @@
 {
   "name": "moonos-media-mcp",
   "version": "1.0.0",
-  "description": "Media control MCP server for MoonOS",
+  "description": "Media control MCP server for openMOON AI",
   "type": "module",
   "main": "index.js",
   "scripts": {

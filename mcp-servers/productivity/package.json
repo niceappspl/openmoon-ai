@@ -1,7 +1,7 @@
 {
   "name": "moonos-productivity-mcp",
   "version": "1.0.0",
-  "description": "Productivity tools MCP server for MoonOS",
+  "description": "Productivity tools MCP server for openMOON AI",
   "type": "module",
   "main": "index.js",
   "scripts": {

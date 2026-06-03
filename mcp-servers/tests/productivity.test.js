@@ -20,7 +20,7 @@ export default [
     description: 'Create markdown note',
     args: {
       title: 'Test Note',
-      content: '# MoonOS Test\n\nThis is a test note with **markdown**.',
+      content: '# openMOON AI Test\n\nThis is a test note with **markdown**.',
       tags: ['test', 'mcp']
     }
   },

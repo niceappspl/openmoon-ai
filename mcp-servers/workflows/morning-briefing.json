@@ -1,0 +1,30 @@
+{
+  "id": "morning-briefing",
+  "name": "Morning Briefing",
+  "description": "Check calendar, emails, battery and system status to start your day",
+  "icon": "☀️",
+  "steps": [
+    {
+      "action": "list_events",
+      "params": { "days": 1 }
+    },
+    {
+      "action": "get_unread_emails",
+      "params": { "count": 5 },
+      "delay": 500
+    },
+    {
+      "action": "get_battery_info",
+      "params": {},
+      "delay": 500
+    },
+    {
+      "action": "show_notification",
+      "params": {
+        "title": "Good morning!",
+        "message": "Your briefing is ready."
+      },
+      "delay": 500
+    }
+  ]
+}

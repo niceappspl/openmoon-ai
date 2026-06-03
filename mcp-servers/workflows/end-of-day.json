@@ -1,0 +1,40 @@
+{
+  "id": "end-of-day",
+  "name": "End of Day",
+  "description": "Review tomorrow's calendar, take a screenshot and quit work apps",
+  "icon": "🌙",
+  "steps": [
+    {
+      "action": "list_events",
+      "params": { "days": 1, "offset_days": 1 }
+    },
+    {
+      "action": "take_screenshot",
+      "params": {},
+      "delay": 500
+    },
+    {
+      "action": "quit_application",
+      "params": { "app": "Slack" },
+      "delay": 500
+    },
+    {
+      "action": "quit_application",
+      "params": { "app": "Google Chrome" },
+      "delay": 300
+    },
+    {
+      "action": "quit_application",
+      "params": { "app": "Visual Studio Code" },
+      "delay": 300
+    },
+    {
+      "action": "show_notification",
+      "params": {
+        "title": "End of Day",
+        "message": "Work apps closed. Great work today!"
+      },
+      "delay": 300
+    }
+  ]
+}
