@@ -635,6 +635,7 @@ async fn run_prompt_trigger(
         &[],
         &tools_for_llm,
         build_budget(&app_settings),
+        None,
         execute_tool,
         on_step,
     )
@@ -787,6 +788,7 @@ async fn send_prompt(
         &history,
         &tools_for_llm,
         build_budget(&app_settings),
+        None,
         execute_tool,
         on_step,
     )
